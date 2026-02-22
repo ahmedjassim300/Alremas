@@ -515,44 +515,23 @@ if('serviceWorker' in navigator){
 }
 </script>
 
-<script type="module">
-import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getFirestore,collection,addDoc,getDocs,onSnapshot,doc,setDoc,deleteDoc,query,orderBy}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-const cfg={apiKey:"AIzaSyC1b96gFY0CVCehktYmZCi1ioKErAE1T80",authDomain:"alremas-f5a7f.firebaseapp.com",projectId:"alremas-f5a7f",storageBucket:"alremas-f5a7f.firebasestorage.app",messagingSenderId:"948379381589",appId:"1:948379381589:web:a4b29061bd9119c5d909dc"};
-const db=getFirestore(initializeApp(cfg));
-window.db=db;
-window.fsLib={collection,addDoc,getDocs,onSnapshot,doc,setDoc,deleteDoc,query,orderBy};
-window.saveOrderToFirebase=async function(o){try{await addDoc(collection(db,'orders'),o);}catch(e){}};
-window.saveUserToFirebase=async function(u){try{await addDoc(collection(db,'users'),u);}catch(e){}};
-window.updateOrderInFirebase=async function(fid,s){try{if(fid)await setDoc(doc(db,'orders',fid),{status:s},{merge:true});}catch(e){}};
-async function sync(){
-  try{
-    var ps=await getDocs(collection(db,'products'));
-    if(!ps.empty){P=ps.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});localStorage.setItem('rm_p',JSON.stringify(P));rndPr();}
-    var cs=await getDocs(collection(db,'categories'));
-    if(!cs.empty){C=cs.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});localStorage.setItem('rm_c',JSON.stringify(C));}
-    onSnapshot(collection(db,'products'),function(snap){
-      P=snap.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});
-      localStorage.setItem('rm_p',JSON.stringify(P));
-      var m=document.getElementById('mer');
-      if(m&&m.style.display!=='none'){rndMP();updSt();}
-      rndPr();
-    });
-    onSnapshot(query(collection(db,'orders'),orderBy('date','desc')),function(snap){
-      OR=snap.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});
-      localStorage.setItem('rm_or',JSON.stringify(OR));
-      var m=document.getElementById('mer');
-      if(m&&m.style.display!=='none'){updSt();var oe=document.getElementById('s-or');if(oe&&!oe.classList.contains('H'))rndOrds();}
-      var vo=document.getElementById('vo');if(vo&&!vo.classList.contains('H'))rndMyOrds();
-    });
-    onSnapshot(collection(db,'users'),function(snap){
-      US=snap.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});
-      localStorage.setItem('rm_us',JSON.stringify(US));
-      updSt();
-      rndCusts();
-    });
-  }catch(e){console.log(e);}
-}
-document.addEventListener('DOMContentLoaded',function(){setTimeout(sync,800);});
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({apiKey:"AIzaSyC1b96gFY0CVCehktYmZCi1ioKErAE1T80",authDomain:"alremas-f5a7f.firebaseapp.com",projectId:"alremas-f5a7f",storageBucket:"alremas-f5a7f.firebasestorage.app",messagingSenderId:"948379381589",appId:"1:948379381589:web:a4b29061bd9119c5d909dc"});
+var _db=firebase.firestore();
+window.saveUserToFirebase=function(u){_db.collection('users').add(u).catch(function(e){console.log('user err',e);});};
+window.saveOrderToFirebase=function(o){_db.collection('orders').add(o).catch(function(e){console.log('order err',e);});};
+window.saveProdToFirebase=function(p){if(p._fid){var fid=p._fid;var d=Object.assign({},p);delete d._fid;_db.collection('products').doc(fid).set(d).then(function(){p._fid=fid;}).catch(function(e){console.log(e);});}else{_db.collection('products').add(p).then(function(r){p._fid=r.id;}).catch(function(e){console.log(e);});}};
+window.deleteProdFromFirebase=function(fid){if(fid)_db.collection('products').doc(fid).delete().catch(function(e){console.log(e);});};
+window.updateOrderInFirebase=function(fid,s){if(fid)_db.collection('orders').doc(fid).update({status:s}).catch(function(e){console.log(e);});};
+document.addEventListener('DOMContentLoaded',function(){
+  setTimeout(function(){
+    _db.collection('products').onSnapshot(function(snap){P=snap.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});localStorage.setItem('rm_p',JSON.stringify(P));var m=document.getElementById('mer');if(m&&m.style.display!=='none'){rndMP();updSt();}rndPr();});
+    _db.collection('orders').orderBy('date','desc').onSnapshot(function(snap){OR=snap.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});localStorage.setItem('rm_or',JSON.stringify(OR));var m=document.getElementById('mer');if(m&&m.style.display!=='none'){updSt();rndOrds();}rndMyOrds();});
+    _db.collection('users').onSnapshot(function(snap){US=snap.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});localStorage.setItem('rm_us',JSON.stringify(US));updSt();rndCusts();});
+    _db.collection('categories').get().then(function(snap){if(!snap.empty){C=snap.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});localStorage.setItem('rm_c',JSON.stringify(C));}});
+  },1000);
+});
 </script>
 </body></html>
