@@ -524,7 +524,8 @@ async function syncAll(){
     onSnapshot(collection(db,'users'),function(snap){
       US=snap.docs.map(function(d){return Object.assign({},d.data(),{_fid:d.id});});
       localStorage.setItem('rm_us',JSON.stringify(US));
-      var ce=document.getElementById('s-cu');if(ce&&!ce.classList.contains('H'))rndCusts();
+      updSt();
+      rndCusts();
     });
   }catch(e){console.log('sync err',e);}
 }
