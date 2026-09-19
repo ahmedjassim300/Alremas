@@ -232,6 +232,7 @@ const sod=(t=Date.now())=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getT
 const DAY=864e5;
 const DAYS=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 const short=v=>v>=1e6?(v/1e6).toFixed(1).replace('.0','')+' م':v>=1e3?Math.round(v/1e3)+' ألف':String(Math.round(v));
+const normU=s=>String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).trim().toLowerCase();
 const num=v=>{const n=parseFloat(String(v).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/,/g,''));return isNaN(n)?0:n};
 
 const IC={
@@ -289,6 +290,7 @@ const catOf=id=>S().cats.find(c=>c.id===id)||{id:'',n:'غير مصنّف',e:'�
 /* ============ طبقة البيانات: محلي أو Firestore ============ */
 const COLS=['products','sales','customers','tasks','users','expenses','shifts','payments','orders','settings'];
 const DB={mode:'local',c:{},subs:[],fs:null,watching:new Set(),err:'',
+n(c){return 'rm_'+c},
 list(c){return this.c[c]||[]},
 get(c,id){return this.list(c).find(x=>x.id===id)},
 on(f){this.subs.push(f)},
@@ -319,7 +321,7 @@ watch(cols){
     if(this.mode!=='cloud')return;
     ps.push(new Promise(ok=>{
       let first=true;const done=()=>{if(first){first=false;ok()}};
-      this.fs.collection(c).onSnapshot(s=>{this.c[c]=s.docs.map(d=>({...d.data(),id:d.id,_fid:d.id}));done();this.emit(c)},e=>{console.warn(c,e.code);done()});
+      this.fs.collection(this.n(c)).onSnapshot(s=>{this.c[c]=s.docs.map(d=>({...d.data(),id:d.id,_fid:d.id}));done();this.emit(c)},e=>{console.warn(c,e.code);done()});
       setTimeout(done,5000);
     }));
   });
@@ -329,12 +331,12 @@ clean(o){return JSON.parse(JSON.stringify(o))},
 persist(c){try{localStorage['rm_'+c]=JSON.stringify(this.c[c])}catch(e){toast('امتلأت مساحة التخزين المحلي — اربط Firebase أو احذف الصور','err')}},
 save(c,o){
   o=this.clean(o);o.id=o.id||uid();o._fid=o.id;o.updatedAt=Date.now();o.createdAt=o.createdAt||o.updatedAt;
-  if(this.mode==='cloud'){this.fs.collection(c).doc(o.id).set(o,{merge:true}).catch(e=>toast('تعذّر الحفظ: '+(e.code||e.message),'err'))}
+  if(this.mode==='cloud'){this.fs.collection(this.n(c)).doc(o.id).set(o,{merge:true}).catch(e=>toast('تعذّر الحفظ: '+(e.code||e.message),'err'))}
   else{const a=this.list(c),i=a.findIndex(x=>x.id===o.id);if(i<0)a.push(o);else a[i]={...a[i],...o};this.c[c]=a;this.persist(c);this.emit(c)}
   return o;
 },
 remove(c,id){
-  if(this.mode==='cloud')this.fs.collection(c).doc(id).delete().catch(e=>toast('تعذّر الحذف: '+(e.code||e.message),'err'));
+  if(this.mode==='cloud')this.fs.collection(this.n(c)).doc(id).delete().catch(e=>toast('تعذّر الحذف: '+(e.code||e.message),'err'));
   else{this.c[c]=this.list(c).filter(x=>x.id!==id);this.persist(c);this.emit(c)}
 },
 /* ops: {t:'set',col,doc} | {t:'inc',col,id,f:{field:delta}} | {t:'del',col,id} */
@@ -344,7 +346,7 @@ batch(ops){
     for(let i=0;i<ops.length;i+=400){
       const b=this.fs.batch();
       ops.slice(i,i+400).forEach(p=>{
-        const r=this.fs.collection(p.col).doc(p.id||p.doc.id);
+        const r=this.fs.collection(this.n(p.col)).doc(p.id||p.doc.id);
         if(p.t==='set'){const d=this.clean(p.doc);d._fid=d.id;d.updatedAt=Date.now();b.set(r,d,{merge:true})}
         else if(p.t==='inc'){const u={};for(const k in p.f)u[k]=F.increment(p.f[k]);b.set(r,u,{merge:true})}
         else if(p.t==='del')b.delete(r);
@@ -379,13 +381,13 @@ const NAV=[
 const Auth={user:null,
 async hash(pw,salt){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+':'+pw));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')},
 async login(u,p){
-  const usr=DB.list('users').find(x=>x.username===String(u).trim().toLowerCase()&&x.active!==false);
+  const usr=DB.list('users').find(x=>x.username===normU(u)&&x.active!==false&&x.salt&&x.pass);
   if(!usr||await this.hash(p,usr.salt)!==usr.pass)return false;
   this.user=usr;localStorage.rm_sess=JSON.stringify({id:usr.id,t:Date.now()});return true;
 },
 restore(){try{const s=JSON.parse(localStorage.rm_sess||'null');if(s&&Date.now()-s.t<12*36e5){const u=DB.get('users',s.id);if(u&&u.active!==false){this.user=u;return true}}}catch(e){}return false},
 logout(){this.user=null;localStorage.removeItem('rm_sess')},
-async make(name,username,role,pw,extra={}){const salt=uid();return{...extra,name,username:username.trim().toLowerCase(),role,salt,pass:await this.hash(pw,salt),active:true}},
+async make(name,username,role,pw,extra={}){const salt=uid();return{...extra,name,username:normU(username),role,salt,pass:await this.hash(pw,salt),active:true}},
 isAdmin(){return this.user&&this.user.role==='admin'}};
 
 /* ============ واجهة: رسائل ونوافذ ============ */
@@ -482,7 +484,7 @@ function onData(){
 const authShell=(inner)=>`<div class="auth"><div class="sheet authc" style="--u:36px"><div class="disp" style="display:flex;align-items:center;gap:.6rem;color:var(--red);margin-bottom:.4rem">${I('book',28)}</div>${inner}<p class="sm mute" style="margin-top:1rem"><a href="#/" style="text-decoration:underline">العودة إلى المتجر</a></p></div></div>`;
 function renderLogin(){
   $('#root').innerHTML=authShell(`<h1>${esc(S().name)}</h1><p class="mute" style="margin-bottom:1.2rem">تسجيل دخول الموظفين</p>
-  <form data-sub="login"><label class="f"><span>اسم المستخدم</span><input class="in" name="u" autocomplete="username" autocapitalize="off" required></label>
+  <form data-sub="login"><label class="f"><span>اسم المستخدم أو رقم الهاتف</span><input class="in" name="u" autocomplete="username" autocapitalize="off" required></label>
   <label class="f"><span>كلمة المرور</span><input class="in" name="p" type="password" autocomplete="current-password" required></label>
   <button class="btn pri lg" style="width:100%">دخول</button><p id="lerr" class="sm" style="color:var(--red);margin-top:.5rem"></p></form>`);
   setTimeout(()=>$('[name=u]').focus(),50);
@@ -496,7 +498,7 @@ function renderSetup(){
   $('#root').innerHTML=authShell(`<h1>أهلاً بك</h1><p class="mute" style="margin-bottom:1.1rem">أنشئ حساب المدير لتبدأ إدارة المكتبة.</p>
   <form data-sub="setup"><label class="f"><span>اسم المكتبة</span><input class="in" name="shop" value="${esc(DEF.name)}" required></label>
   <label class="f"><span>اسمك</span><input class="in" name="name" required></label>
-  <div class="g2"><label class="f"><span>اسم المستخدم</span><input class="in" name="u" autocapitalize="off" required></label>
+  <div class="g2"><label class="f"><span>اسم المستخدم (عربي أو رقم هاتف)</span><input class="in" name="u" autocapitalize="off" required></label>
   <label class="f"><span>كلمة المرور (6 أحرف فأكثر)</span><input class="in" name="p" type="password" minlength="6" required></label></div>
   <button class="btn pri lg" style="width:100%">إنشاء الحساب والبدء</button></form>`);
 }
@@ -1196,10 +1198,10 @@ Act.unew=()=>userModal();
 Act.uedit=el=>userModal(DB.get('users',el.dataset.id));
 function userModal(u){
   const n=!u;u=u||{role:'cashier',active:true};
-  const m=modal({title:n?'مستخدم جديد':'تعديل المستخدم',body:`<form id="fu"><label class="f"><span>الاسم</span><input class="in" name="n" value="${esc(u.name||'')}" required></label><div class="g2"><label class="f"><span>اسم المستخدم</span><input class="in" name="u" value="${esc(u.username||'')}" autocapitalize="off" required></label><label class="f"><span>الصلاحية</span><select class="in" name="r">${opts(Object.entries(ROLES),u.role)}</select></label></div>
+  const m=modal({title:n?'مستخدم جديد':'تعديل المستخدم',body:`<form id="fu"><label class="f"><span>الاسم</span><input class="in" name="n" value="${esc(u.name||'')}" required></label><div class="g2"><label class="f"><span>اسم المستخدم <small class="mute">(عربي أو رقم هاتف)</small></span><input class="in" name="u" value="${esc(u.username||'')}" autocapitalize="off" required></label><label class="f"><span>الصلاحية</span><select class="in" name="r">${opts(Object.entries(ROLES),u.role)}</select></label></div>
   <label class="f"><span>${n?'كلمة المرور':'كلمة مرور جديدة (اتركها فارغة للإبقاء)'}</span><input class="in" name="p" type="password" minlength="6" ${n?'required':''} autocomplete="new-password"></label><label class="row" style="gap:.4rem"><input type="checkbox" name="a" ${u.active!==false?'checked':''}> الحساب فعّال</label></form>`,foot:`<button class="btn pri" form="fu">حفظ</button><button class="btn" data-act="close">إلغاء</button>`});
   form(m,async d=>{
-    const un=d.u.trim().toLowerCase();
+    const un=normU(d.u);
     if(DB.list('users').some(x=>x.username===un&&x.id!==u.id)){toast('اسم المستخدم مستخدم','err');return false}
     const active=!!d.a,others=DB.list('users').filter(x=>x.id!==u.id&&x.role==='admin'&&x.active!==false).length;
     if(!(d.r==='admin'&&active)&&!others){toast('يجب أن يبقى مدير فعّال واحد على الأقل','err');return false}
