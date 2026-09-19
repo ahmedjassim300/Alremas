@@ -194,7 +194,7 @@ td.e,th.e{text-align:end}
 /* responsive */
 @media (max-width:1100px){.pos{grid-template-columns:minmax(0,1fr)}.cartp{position:fixed;inset-inline:0;bottom:0;top:auto;max-height:86vh;border-radius:18px 18px 0 0;z-index:70;transform:translateY(110%);transition:transform .22s}.cartp.open{transform:none}.cartbar{display:flex;position:fixed;inset-inline:.8rem;bottom:.8rem;z-index:65;background:var(--side);color:#fff;border-radius:14px;padding:.8rem 1.1rem;justify-content:space-between;align-items:center;font-weight:600;box-shadow:0 8px 24px rgba(8,14,38,.35)}.cartbar b{color:var(--hl);font-family:'Lalezar',sans-serif;font-weight:400;font-size:1.3rem}.c21,.c3{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:900px),(pointer:coarse) and (max-width:1200px){.app{grid-template-columns:minmax(0,1fr)}.side{display:none;position:fixed;inset-block:0;inset-inline-start:0;width:260px;height:100dvh}.side.open{display:flex;box-shadow:0 0 0 100vmax rgba(8,14,38,.5)}.menu{display:inline-flex}.main{padding:1rem .9rem 6rem}.board{grid-template-columns:minmax(0,1fr)}.top{padding:.55rem .8rem}.c2{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:560px){.userpill{display:none}.top{gap:.4rem;padding:.5rem .6rem}.top h2{font-size:1.25rem}.pill{padding:.25rem .6rem;font-size:.8rem}.g2,.g3{grid-template-columns:minmax(0,1fr)}.hero{--u:32px;padding-inline-start:84px;padding-inline-end:44px}.sheet::before{inset-inline-start:52px}.authc{padding-inline-start:80px;padding-inline-end:44px}.sgrid{grid-template-columns:repeat(2,1fr);gap:.7rem}.ph1 h1{font-size:1.5rem}.st-h .in{min-width:0}}
+@media (max-width:560px){.st-h{flex-wrap:wrap;gap:.5rem;padding:.5rem .7rem}.st-h .stq{order:9;flex:1 1 100%!important;max-width:none!important}.st-h .lbl{display:none}.userpill{display:none}.top{gap:.4rem;padding:.5rem .6rem}.top h2{font-size:1.25rem}.pill{padding:.25rem .6rem;font-size:.8rem}.g2,.g3{grid-template-columns:minmax(0,1fr)}.hero{--u:32px;padding-inline-start:84px;padding-inline-end:44px}.sheet::before{inset-inline-start:52px}.authc{padding-inline-start:80px;padding-inline-end:44px}.sgrid{grid-template-columns:repeat(2,1fr);gap:.7rem}.ph1 h1{font-size:1.5rem}.st-h .in{min-width:0}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -288,7 +288,7 @@ const S=()=>({...DEF,...(DB.get('settings','main')||{})});
 const catOf=id=>S().cats.find(c=>c.id===id)||{id:'',n:'غير مصنّف',e:'📦',c:'#E7EBF3'};
 
 /* ============ طبقة البيانات: محلي أو Firestore ============ */
-const COLS=['products','sales','customers','tasks','users','expenses','shifts','payments','orders','settings'];
+const COLS=['products','sales','customers','tasks','users','expenses','shifts','payments','orders','settings','accounts'];
 const DB={mode:'local',c:{},subs:[],fs:null,watching:new Set(),err:'',
 n(c){return 'rm_'+c},
 list(c){return this.c[c]||[]},
@@ -328,6 +328,18 @@ watch(cols){
   return Promise.all(ps);
 },
 clean(o){return JSON.parse(JSON.stringify(o))},
+async fetch(c,id){
+  if(this.mode==='cloud'){const d=await this.fs.collection(this.n(c)).doc(id).get();return d.exists?{...d.data(),id:d.id}:null}
+  return this.get(c,id)||null;
+},
+async query(c,f,v){
+  if(this.mode==='cloud'){const q=await this.fs.collection(this.n(c)).where(f,'==',v).get();return q.docs.map(d=>({...d.data(),id:d.id}))}
+  return this.list(c).filter(x=>x[f]===v);
+},
+async legacy(name){
+  if(this.mode!=='cloud')throw new Error('يتطلب الربط بـ Firebase');
+  const q=await this.fs.collection(name).get();return q.docs.map(d=>({...d.data(),_id:d.id}));
+},
 persist(c){try{localStorage['rm_'+c]=JSON.stringify(this.c[c])}catch(e){toast('امتلأت مساحة التخزين المحلي — اربط Firebase أو احذف الصور','err')}},
 save(c,o){
   o=this.clean(o);o.id=o.id||uid();o._fid=o.id;o.updatedAt=Date.now();o.createdAt=o.createdAt||o.updatedAt;
@@ -1183,6 +1195,7 @@ V.settings={t:'الإعدادات',html(){
   <textarea class="in" id="fbcfg" placeholder='{apiKey:"...", authDomain:"...", projectId:"...", appId:"..."}' style="min-height:70px;direction:ltr"></textarea>
   <div class="row" style="margin-top:.5rem"><button class="btn s" data-act="fbsave">حفظ وإعادة التحميل</button>${localStorage.rm_fbcfg?`<button class="btn s ghost" data-act="fbclear" style="color:var(--red)">فصل</button>`:''}</div>
   <p class="sm mute" style="margin-top:.7rem">تنبيه أمني: الدخول هنا يعتمد على حسابات محفوظة في قاعدة البيانات نفسها، لذلك يجب أن تسمح قواعد Firestore بالوصول من التطبيق. للحماية الكاملة يُنصح بالانتقال إلى Firebase Authentication.</p></div>
+  <div class="card"><h3>حسابات الزبائن</h3>${DB.list('accounts').length?`<div class="list" style="max-height:260px;overflow:auto">${DB.list('accounts').map(a=>`<div class="li"><span class="av">${esc((a.fn||'؟')[0])}</span><div style="flex:1;min-width:0"><b>${esc([a.fn,a.ln].filter(Boolean).join(' '))}</b><div class="sm mute">${esc(a.phone)}</div></div><button class="btn s" data-act="accpw" data-id="${a.id}">كلمة سر جديدة</button><button class="btn s ghost ic1" style="color:var(--red)" data-act="accdel" data-id="${a.id}" aria-label="حذف">${I('trash',15)}</button></div>`).join('')}</div>`:'<p class="sm mute">لا توجد حسابات بعد. يسجّل الزبون حسابه من صفحة المتجر.</p>'}<button class="btn s" style="margin-top:.7rem" data-act="legacy">${I('dl',15)}استيراد حسابات من النظام القديم</button></div>
   <div class="card"><h3>النسخ الاحتياطي</h3><p class="sm mute" style="margin-bottom:.7rem">حمّل نسخة كاملة من بياناتك دورياً. الاستعادة تدمج الملف مع الموجود.</p><div class="row"><button class="btn" data-act="bkexp">${I('dl',16)}تنزيل نسخة احتياطية</button><label class="btn">${I('up',16)}استعادة من ملف<input type="file" accept=".json,application/json" hidden id="bkfile" data-ch="bkimp"></label></div></div>
   <div class="card"><h3>بيانات تجريبية</h3><p class="sm mute" style="margin-bottom:.7rem">منتجات وفواتير وعملاء ومهام وهمية لتجربة النظام. تُحذف كلها بضغطة واحدة دون المساس ببياناتك.</p><div class="row"><button class="btn" data-act="seed">حمّل بيانات تجريبية</button>${demo?`<button class="btn" data-act="unseed" style="color:var(--red)">${I('trash',15)}احذف البيانات التجريبية</button>`:''}</div></div></div></div>`;
 }};
@@ -1265,7 +1278,51 @@ Act.unseed=async()=>{
   DB.batch(ops);toast('تم حذف البيانات التجريبية','ok');
 };
 
+Act.accpw=el=>{
+  const a=DB.get('accounts',el.dataset.id);if(!a)return;
+  const m=modal({title:'كلمة سر جديدة — '+esc(a.fn||''),body:`<form id="fap"><label class="f"><span>كلمة المرور الجديدة (6 أحرف فأكثر)</span><input class="in" name="p" type="text" minlength="6" required autocomplete="off"></label></form>`,foot:`<button class="btn pri" form="fap">حفظ</button><button class="btn" data-act="close">إلغاء</button>`});
+  form(m,async d=>{const salt=uid();DB.save('accounts',{...a,salt,pass:await Auth.hash(d.p,salt),legacy:false});toast('تم تغيير كلمة المرور — أبلغ الزبون بها','ok')});
+};
+Act.accdel=async el=>{const a=DB.get('accounts',el.dataset.id);if(a&&await ask(`حذف حساب «${esc(a.fn||a.phone)}»؟ لن يستطيع الدخول، وتبقى طلباته السابقة.`,{danger:1,ok:'حذف'}))DB.remove('accounts',a.id)};
+Act.legacy=()=>{
+  if(DB.mode!=='cloud'){toast('يتطلب الربط بـ Firebase','err');return}
+  const m=modal({title:'استيراد حسابات من النظام القديم',body:`<form id="fl" class="row" style="flex-wrap:nowrap;align-items:flex-end"><label class="f" style="flex:1;margin:0"><span>اسم المجموعة القديمة</span><input class="in" name="c" value="users" required></label><button class="btn pri">قراءة</button></form><p class="sm mute" style="margin-top:.5rem">المجموعة القديمة لا تُعدَّل ولا تُحذف. كلمات المرور تُشفَّر عند الاستيراد.</p><div id="lres" style="margin-top:.8rem"></div>`,nofocus:1});
+  $('#fl',m).addEventListener('submit',async e=>{
+    e.preventDefault();const box=$('#lres',m);box.textContent='جارٍ القراءة…';let docs;
+    try{docs=await DB.legacy(e.target.elements.c.value.trim())}catch(x){box.innerHTML=`<span style="color:var(--red)">تعذّرت القراءة: ${esc(x.code||x.message)}</span>`;return}
+    if(!docs.length){box.textContent='المجموعة فارغة أو غير موجودة';return}
+    const roles={};docs.forEach(d=>{const r=String(d.role??'');roles[r]=(roles[r]||0)+1});
+    box.innerHTML=`<p class="sm" style="margin-bottom:.6rem">وجدت ${docs.length} مستنداً. اختر ما يُفعل بكل نوع (role):</p>`+Object.entries(roles).map(([r,n])=>`<label class="f row" style="gap:.6rem;margin-bottom:.5rem"><span style="min-width:110px">role = <b>${esc(r||'—')}</b> (${n})</span><select class="in" data-role="${esc(r)}" style="flex:1">${opts([['skip','تجاهل'],['cust','حساب زبون'],['admin','موظف — مدير'],['cashier','موظف — كاشير']],r==='c'?'cust':'skip')}</select></label>`).join('')+`<button class="btn pri" id="lgo" type="button">استيراد</button><div id="lout" class="sm" style="margin-top:.6rem"></div>`;
+    $('#lgo',m).onclick=async()=>{
+      const map={};$$('[data-role]',m).forEach(s=>map[s.dataset.role]=s.value);
+      let nc=0,ns=0,skip=0,bad=0;const ops=[],seen=new Set();
+      for(const d of docs){
+        const act=map[String(d.role??'')]||'skip';if(act==='skip')continue;
+        const pw=String(d.pw??'');if(!pw||/^[0-9a-f]{64}$/i.test(pw)){bad++;continue}
+        const name=[d.fn,d.ln].filter(Boolean).join(' ').trim()||String(d.ph||'');
+        if(act==='cust'){
+          const ph=normPhone(d.ph);if(!/^07\d{9}$/.test(ph)){bad++;continue}
+          const id='a_'+ph;if(seen.has(id)||DB.get('accounts',id)){skip++;continue}seen.add(id);
+          const salt=uid();ops.push({t:'set',col:'accounts',doc:{id,fn:d.fn||'',ln:d.ln||'',phone:ph,addr:d.addr||'',salt,pass:await Auth.hash(pw,salt),legacy:true}});nc++;
+        }else{
+          const un=normU(d.ph||d.fn);if(!un||seen.has('u'+un)||DB.list('users').some(u=>u.username===un)){skip++;continue}seen.add('u'+un);
+          ops.push({t:'set',col:'users',doc:await Auth.make(name,un,act,pw,{id:uid(),legacy:true})});ns++;
+        }
+      }
+      if(ops.length)DB.batch(ops);
+      $('#lout',m).innerHTML=`تم استيراد <b>${nc}</b> زبون و<b>${ns}</b> موظف. تخطّيت ${skip} (مكرر) و${bad} (بلا رقم صالح أو كلمة سر قابلة للاستيراد).`+(ns?'<br>الموظفون المستوردون يدخلون برقم هواتفهم (أو اسمهم إن لم يوجد هاتف) وكلمة سرهم القديمة.':'');
+      $('#lgo',m).disabled=true;
+    };
+  });
+};
+
 /* ============ المتجر العام (للزبائن) ============ */
+const normPhone=p=>{let d=String(p||'').replace(/[٠-٩]/g,x=>'٠١٢٣٤٥٦٧٨٩'.indexOf(x)).replace(/\D/g,'');if(d.startsWith('00964'))d='0'+d.slice(5);else if(d.startsWith('964'))d='0'+d.slice(3);else if(/^7\d{9}$/.test(d))d='0'+d;return d};
+const Cust={cur:null,
+  set(a){this.cur={id:a.id,fn:a.fn||'',ln:a.ln||'',phone:a.phone,addr:a.addr||''};localStorage.rm_cust=JSON.stringify({acc:this.cur,t:Date.now()})},
+  out(){this.cur=null;localStorage.removeItem('rm_cust')},
+  load(){try{const s=JSON.parse(localStorage.rm_cust||'null');if(s&&Date.now()-s.t<30*DAY)this.cur=s.acc}catch(e){}}};
+Cust.load();
 const Store={
   cat:'all',q:'',m:null,
   cart:(()=>{try{return JSON.parse(localStorage.rm_scart||'[]')}catch(e){return[]}})(),
@@ -1277,8 +1334,8 @@ const Store={
   render(){
     const s=S();document.title=s.name;
     $('#root').innerHTML=`<header class="st-h"><a class="brand" href="#/"><span style="width:34px;height:34px;border-radius:8px;background:#fff;border:1px solid var(--line);border-inline-start:6px double var(--red);display:grid;place-items:center;color:var(--pri)">${I('book',18)}</span><span>${esc(s.name)}</span></a>
-    <input class="in" data-in="sq" placeholder="ابحث عن دفتر، كتاب، قلم…" style="flex:1;max-width:460px" value="${esc(this.q)}" aria-label="بحث">
-    <span class="sp"></span><button class="btn pri" id="scb" data-act="scart">${I('cart',18)}<span>السلة</span><span class="bd hl" id="scn" style="background:var(--hl);color:#0F1F4D"></span></button>
+    <input class="in stq" data-in="sq" placeholder="ابحث عن دفتر، كتاب، قلم…" style="flex:1;max-width:460px" value="${esc(this.q)}" aria-label="بحث">
+    <span class="sp"></span><button class="btn" data-act="acct">${I('user',18)}<span class="lbl">${Cust.cur?esc(Cust.cur.fn||'حسابي'):'حسابي'}</span></button><button class="btn pri" id="scb" data-act="scart">${I('cart',18)}<span class="lbl">السلة</span><span class="bd hl" id="scn" style="background:var(--hl);color:#0F1F4D"></span></button>
     <button class="btn ic1 ghost" data-act="theme" id="thm" aria-label="الوضع الداكن"></button><a class="btn ic1 ghost" href="#/admin" title="دخول الموظفين" aria-label="دخول الموظفين">${I('lock',18)}</a></header>
     <div class="st-w"><section class="sheet hero"><h1>${esc(s.name)}</h1><p>كتب مدرسية ودفاتر وأقلام وحقائب وكل قرطاسية الدوام. اطلب من هنا وتسلّم من المكتبة أو نوصّل الطلب إلى بيتك.</p>
     <div class="row"><button class="btn pri lg" data-act="sbrowse">تصفّح المنتجات</button>${s.phone?`<a class="btn lg" href="${waLink(s.phone,'مرحباً، أريد الاستفسار عن منتج')}" target="_blank" rel="noopener">${I('wa',20)}واتساب</a>`:''}</div></section>
@@ -1326,6 +1383,7 @@ Act.scart=()=>{
   <label class="f" id="addrw"><span>العنوان (المنطقة وأقرب نقطة دالة)</span><input class="in" name="a"></label><label class="f"><span>ملاحظات (اختياري)</span><input class="in" name="t"></label>
   <button class="btn pri lg" id="osub" style="width:100%">إرسال الطلب</button><p class="sm mute" style="margin-top:.5rem">الدفع عند الاستلام. سنتواصل معك لتأكيد الطلب.</p></form>`});
   Store.m=m;m._close=()=>{Store.m=null;Store.paint()};Store.paintCart();
+  if(Cust.cur){const f=$('#ordf').elements;f.n.value=[Cust.cur.fn,Cust.cur.ln].filter(Boolean).join(' ');f.p.value=Cust.cur.phone;f.a.value=Cust.cur.addr||''}
 };
 Act.odel=el=>{const f=el.closest('form');f.elements.m.value=el.dataset.m;$$('.seg button',f).forEach(b=>b.classList.toggle('on',b===el));$('#addrw').style.display=el.dataset.m==='delivery'?'':'none';f.elements.a.required=el.dataset.m==='delivery'};
 Sub.order=f=>{
@@ -1333,7 +1391,7 @@ Sub.order=f=>{
   if(!Store.cart.length){toast('السلة فارغة','err');return}
   const items=[];
   for(const l of Store.cart){const p=DB.get('products',l.pid);if(!p||l.qty>(p.stock||0)){toast('الكمية المطلوبة من «'+(p?p.name:'منتج')+'» غير متوفرة','err');return}items.push({pid:p.id,name:p.name,qty:l.qty,price:p.price})}
-  const o={id:uid(),no:'W'+String(Date.now()).slice(-6),ts:Date.now(),name:d.n.trim(),phone:d.p.trim(),addr:d.m==='delivery'?d.a.trim():'',delivery:d.m,note:d.t.trim(),items,total:items.reduce((a,i)=>a+i.price*i.qty,0),status:'new',via:'store'};
+  const o={id:uid(),no:'W'+String(Date.now()).slice(-6),ts:Date.now(),name:d.n.trim(),phone:d.p.trim(),addr:d.m==='delivery'?d.a.trim():'',delivery:d.m,note:d.t.trim(),accId:Cust.cur?Cust.cur.id:'',items,total:items.reduce((a,i)=>a+i.price*i.qty,0),status:'new',via:'store'};
   DB.save('orders',o);Store.cart=[];Store.keep();
   const m=Store.m;Store.m=null;if(m){m._close=null;m.remove()}
   const s=S(),msg=`طلب جديد ${o.no}\n${o.items.map(i=>`• ${i.name} × ${i.qty}`).join('\n')}\nالإجمالي: ${fmt(o.total)} ${s.cur}\nالاسم: ${o.name}\n${o.delivery==='delivery'?'العنوان: '+o.addr:'استلام من المكتبة'}`;
@@ -1363,6 +1421,41 @@ function setupPWA(){
     $('#root').innerHTML=`<div class="auth"><div class="card" style="max-width:420px;text-align:center"><h3>تعذّر تشغيل النظام</h3><p class="mute" style="margin:.5rem 0 1rem">${esc(e.message)}</p><button class="btn pri" onclick="location.reload()">إعادة المحاولة</button></div></div>`;
   }
 })();
+
+/* ---- حسابات الزبائن ---- */
+Act.acct=()=>{
+  if(Cust.cur){
+    const c=Cust.cur;
+    modal({title:'حسابي',body:`<div class="row" style="margin-bottom:1rem"><span class="av" style="width:48px;height:48px;font-size:1.3rem">${esc((c.fn||'؟')[0])}</span><div><b>${esc([c.fn,c.ln].filter(Boolean).join(' '))}</b><div class="mute sm">${esc(c.phone)}</div></div></div><div class="col1"><button class="btn" data-act="myorders">${I('receipt',16)}طلباتي السابقة</button><button class="btn" data-act="cout" style="color:var(--red)">${I('out',16)}تسجيل الخروج</button></div>`});
+    return;
+  }
+  modal({title:'حسابي',body:`<div class="seg" style="margin-bottom:1rem"><button class="on" data-act="ctab" data-t="login">تسجيل الدخول</button><button data-act="ctab" data-t="reg">حساب جديد</button></div>
+  <form data-sub="clogin" id="cf1"><label class="f"><span>رقم الهاتف</span><input class="in" name="p" inputmode="tel" required autocomplete="tel"></label><label class="f"><span>كلمة المرور</span><input class="in" name="pw" type="password" required autocomplete="current-password"></label><button class="btn pri lg" style="width:100%">دخول</button><p id="cerr" class="sm" style="color:var(--red);margin-top:.5rem"></p><p class="sm mute" style="margin-top:.4rem">نسيت كلمة المرور؟ تواصل مع المكتبة لتعيينها.</p></form>
+  <form data-sub="creg" id="cf2" class="hide"><div class="g2"><label class="f"><span>الاسم الأول</span><input class="in" name="fn" required autocomplete="given-name"></label><label class="f"><span>الاسم الأخير</span><input class="in" name="ln" required autocomplete="family-name"></label></div><label class="f"><span>رقم الهاتف (07XXXXXXXXX)</span><input class="in" name="p" inputmode="tel" required autocomplete="tel"></label><label class="f"><span>كلمة المرور (6 أحرف فأكثر)</span><input class="in" name="pw" type="password" minlength="6" required autocomplete="new-password"></label><label class="f"><span>العنوان (اختياري)</span><input class="in" name="a"></label><button class="btn pri lg" style="width:100%">إنشاء الحساب</button></form>
+  <p class="sm mute" style="margin-top:.8rem">يمكنك أيضاً الطلب دون حساب.</p>`,nofocus:1});
+};
+Act.ctab=el=>{const m=el.closest('.mdl');$$('.seg button',m).forEach(b=>b.classList.toggle('on',b===el));$('#cf1',m).classList.toggle('hide',el.dataset.t!=='login');$('#cf2',m).classList.toggle('hide',el.dataset.t!=='reg')};
+Act.cout=()=>{Cust.out();$$('.mdl').forEach(closeModal);Store.render();toast('تم تسجيل الخروج')};
+Sub.creg=async f=>{
+  const d=Object.fromEntries(new FormData(f)),ph=normPhone(d.p);
+  if(!/^07\d{9}$/.test(ph)){toast('أدخل رقم هاتف عراقي صحيحاً (07XXXXXXXXX)','err');return}
+  const id='a_'+ph;let ex=null;
+  try{ex=await DB.fetch('accounts',id)}catch(e){toast('تعذّر الاتصال، حاول لاحقاً','err');return}
+  if(ex){toast('هذا الرقم مسجل مسبقاً — سجّل دخولك','err');return}
+  const salt=uid(),acc=DB.save('accounts',{id,fn:d.fn.trim(),ln:d.ln.trim(),phone:ph,addr:d.a.trim(),salt,pass:await Auth.hash(d.pw,salt)});
+  Cust.set(acc);$$('.mdl').forEach(closeModal);toast('أهلاً '+acc.fn+'، تم إنشاء حسابك','ok');Store.render();
+};
+Sub.clogin=async f=>{
+  const d=Object.fromEntries(new FormData(f));let a=null;
+  try{a=await DB.fetch('accounts','a_'+normPhone(d.p))}catch(e){toast('تعذّر الاتصال، حاول لاحقاً','err');return}
+  if(!a||!a.salt||await Auth.hash(d.pw,a.salt)!==a.pass){$('#cerr').textContent='رقم الهاتف أو كلمة المرور غير صحيحة';return}
+  Cust.set(a);$$('.mdl').forEach(closeModal);toast('أهلاً '+(a.fn||''),'ok');Store.render();
+};
+Act.myorders=async()=>{
+  $$('.mdl').forEach(closeModal);let l=[];
+  try{l=(await DB.query('orders','accId',Cust.cur.id)).sort((a,b)=>b.ts-a.ts)}catch(e){toast('تعذّر تحميل الطلبات','err');return}
+  modal({title:'طلباتي',body:l.length?`<div class="list">${l.map(o=>`<div class="li" style="align-items:flex-start"><div style="flex:1"><b class="disp">${esc(o.no)}</b> <span class="bd ${OST[o.status]?OST[o.status][1]:'mute'}">${OST[o.status]?OST[o.status][0]:''}</span><div class="sm mute">${dt(o.ts)} • ${o.items.map(i=>esc(i.name)+' ×'+i.qty).join('، ')}</div></div><b>${fmt(o.total)}</b></div>`).join('')}</div>`:empty('🛍️','لا طلبات بعد','ستظهر طلباتك هنا بعد أول طلب')});
+};
 
 </script>
 </body>
