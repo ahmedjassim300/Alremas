@@ -209,7 +209,14 @@ td.e,th.e{text-align:end}
    الصق هنا إعدادات مشروعك (نفس التي كانت في النسخة القديمة)، مثال:
    const FIREBASE_CONFIG={apiKey:"...",authDomain:"...",projectId:"...",storageBucket:"...",messagingSenderId:"...",appId:"..."};
    وإذا تركتها null يعمل النظام على هذا الجهاز فقط (تخزين محلي). */
-const FIREBASE_CONFIG=null;
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyC1b96gFY0CVCehktYmZCi1ioKErAE1T80",
+  authDomain:"alremas-f5a7f.firebaseapp.com",
+  projectId:"alremas-f5a7f",
+  storageBucket:"alremas-f5a7f.firebasestorage.app",
+  messagingSenderId:"948379381589",
+  appId:"1:948379381589:web:a4b29061bd9119c5d909dc"
+};
 
 /* ============ أدوات عامة ============ */
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
