@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0F1F4D">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>مكتبة الريماس</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -209,6 +212,10 @@ td.e,th.e{text-align:end}
    الصق هنا إعدادات مشروعك (نفس التي كانت في النسخة القديمة)، مثال:
    const FIREBASE_CONFIG={apiKey:"...",authDomain:"...",projectId:"...",storageBucket:"...",messagingSenderId:"...",appId:"..."};
    وإذا تركتها null يعمل النظام على هذا الجهاز فقط (تخزين محلي). */
+/* ============ رمز الإعداد الأولي ============
+   الإعداد الأولي (إنشاء أول حساب مدير) لا يعمل إلا بهذا الرمز السري، والمحفوظ هنا هو بصمته فقط.
+   لتغيير الرمز: شغّل في Console المتصفح:  await Auth.setupHash("رمزك الجديد")  ثم ضع الناتج هنا. */
+const SETUP_HASH="a3601ffd1e42bed388d36d03c8290bf593611d6174f021f12a91553db89d6759";
 const FIREBASE_CONFIG={
   apiKey:"AIzaSyC1b96gFY0CVCehktYmZCi1ioKErAE1T80",
   authDomain:"alremas-f5a7f.firebaseapp.com",
@@ -289,7 +296,7 @@ const catOf=id=>S().cats.find(c=>c.id===id)||{id:'',n:'غير مصنّف',e:'�
 
 /* ============ طبقة البيانات: محلي أو Firestore ============ */
 const COLS=['products','sales','customers','tasks','users','expenses','shifts','payments','orders','settings','accounts'];
-const DB={mode:'local',c:{},subs:[],fs:null,watching:new Set(),err:'',
+const DB={mode:'local',c:{},subs:[],fs:null,watching:new Set(),err:'',errs:{},
 n(c){return 'rm_'+c},
 list(c){return this.c[c]||[]},
 get(c,id){return this.list(c).find(x=>x.id===id)},
@@ -321,7 +328,7 @@ watch(cols){
     if(this.mode!=='cloud')return;
     ps.push(new Promise(ok=>{
       let first=true;const done=()=>{if(first){first=false;ok()}};
-      this.fs.collection(this.n(c)).onSnapshot(s=>{this.c[c]=s.docs.map(d=>({...d.data(),id:d.id,_fid:d.id}));done();this.emit(c)},e=>{console.warn(c,e.code);done()});
+      this.fs.collection(this.n(c)).onSnapshot(s=>{this.c[c]=s.docs.map(d=>({...d.data(),id:d.id,_fid:d.id}));done();this.emit(c)},e=>{console.warn(c,e.code);this.errs[c]=e.code||'error';done()});
       setTimeout(done,5000);
     }));
   });
@@ -391,10 +398,22 @@ const NAV=[
 {id:'reports',t:'التقارير',ic:'chart',r:['admin']},
 {id:'settings',t:'الإعدادات',ic:'settings',r:['admin']}];
 const Auth={user:null,
-async hash(pw,salt){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+':'+pw));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')},
+async legacyHash(pw,salt){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+':'+pw));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')},
+async hash(pw,salt){
+  const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+  const b=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:new TextEncoder().encode(salt),iterations:100000},k,256);
+  return 'p1$'+[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+},
+async verify(pw,rec){
+  if(!rec||!rec.salt||!rec.pass)return false;
+  return String(rec.pass).startsWith('p1$')?(await this.hash(pw,rec.salt))===rec.pass:(await this.legacyHash(pw,rec.salt))===rec.pass;
+},
+async setupHash(code){const c=String(code).replace(/[\s-]/g,'').toUpperCase(),b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('alremas-setup:'+c));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')},
+async setupOk(code){return !!SETUP_HASH&&(await this.setupHash(code))===SETUP_HASH},
 async login(u,p){
   const usr=DB.list('users').find(x=>x.username===normU(u)&&x.active!==false&&x.salt&&x.pass);
-  if(!usr||await this.hash(p,usr.salt)!==usr.pass)return false;
+  if(!usr||!(await this.verify(p,usr)))return false;
+  if(!String(usr.pass).startsWith('p1$')){const salt=uid();usr.salt=salt;usr.pass=await this.hash(p,salt);DB.save('users',usr)}
   this.user=usr;localStorage.rm_sess=JSON.stringify({id:usr.id,t:Date.now()});return true;
 },
 restore(){try{const s=JSON.parse(localStorage.rm_sess||'null');if(s&&Date.now()-s.t<12*36e5){const u=DB.get('users',s.id);if(u&&u.active!==false){this.user=u;return true}}}catch(e){}return false},
@@ -473,14 +492,16 @@ Act.menu=()=>$('#side').classList.toggle('open');
 document.addEventListener('click',e=>{const sd=$('#side');if(sd&&sd.classList.contains('open')&&!e.target.closest('#side')&&!e.target.closest('[data-act=menu]'))sd.classList.remove('open')});
 Act.logout=()=>{Auth.logout();location.hash='#/admin';renderLogin()};
 
+const setupOpen=()=>!S().setupDone&&!DB.list('users').some(u=>u.pass);
 async function route(){
   const h=location.hash.replace(/^#\/?/,'').split('/');
   if(h[0]!=='admin'){Store.render();return}
   if(!Auth.user){
-    await DB.watch(COLS);
-    if(!DB.list('users').length){renderSetup();return}
+    await DB.watch(['users','settings']);
+    if(h[1]==='setup'){if(setupOpen()){renderSetup();return}location.hash='#/admin';return}
     if(!Auth.restore()){renderLogin();return}
   }
+  if(!DB.watching.has('sales')){$('#root').innerHTML='<div class="auth"><div class="mute">جاري التحميل…</div></div>';await DB.watch(COLS)}
   const nv=h[1]||(NAV.some(n=>n.id===VIEW)?VIEW:'dash');
   if(nv!==VIEW)scrollTo(0,0);
   VIEW=nv;renderApp();
@@ -495,10 +516,12 @@ function onData(){
 
 const authShell=(inner)=>`<div class="auth"><div class="sheet authc" style="--u:36px"><div class="disp" style="display:flex;align-items:center;gap:.6rem;color:var(--red);margin-bottom:.4rem">${I('book',28)}</div>${inner}<p class="sm mute" style="margin-top:1rem"><a href="#/" style="text-decoration:underline">العودة إلى المتجر</a></p></div></div>`;
 function renderLogin(){
+  const none=!DB.list('users').length,bad=Object.keys(DB.errs).length;
   $('#root').innerHTML=authShell(`<h1>${esc(S().name)}</h1><p class="mute" style="margin-bottom:1.2rem">تسجيل دخول الموظفين</p>
   <form data-sub="login"><label class="f"><span>اسم المستخدم أو رقم الهاتف</span><input class="in" name="u" autocomplete="username" autocapitalize="off" required></label>
   <label class="f"><span>كلمة المرور</span><input class="in" name="p" type="password" autocomplete="current-password" required></label>
-  <button class="btn pri lg" style="width:100%">دخول</button><p id="lerr" class="sm" style="color:var(--red);margin-top:.5rem"></p></form>`);
+  <button class="btn pri lg" style="width:100%">دخول</button><p id="lerr" class="sm" style="color:var(--red);margin-top:.5rem"></p></form>
+  ${bad?`<p class="sm" style="color:var(--red)">تعذّر تحميل الحسابات من قاعدة البيانات (${esc(Object.values(DB.errs)[0])}). تحقق من الاتصال والقواعد.</p>`:none&&setupOpen()?`<p class="sm mute">لم يُنشأ حساب المدير بعد. <a href="#/admin/setup" style="text-decoration:underline">الإعداد الأولي (للمالك فقط)</a></p>`:''}`);
   setTimeout(()=>$('[name=u]').focus(),50);
 }
 Sub.login=async f=>{
@@ -507,16 +530,19 @@ Sub.login=async f=>{
   else{$('#lerr').textContent='اسم المستخدم أو كلمة المرور غير صحيحة';f.elements.p.select()}
 };
 function renderSetup(){
-  $('#root').innerHTML=authShell(`<h1>أهلاً بك</h1><p class="mute" style="margin-bottom:1.1rem">أنشئ حساب المدير لتبدأ إدارة المكتبة.</p>
-  <form data-sub="setup"><label class="f"><span>اسم المكتبة</span><input class="in" name="shop" value="${esc(DEF.name)}" required></label>
+  $('#root').innerHTML=authShell(`<h1>الإعداد الأولي</h1><p class="mute" style="margin-bottom:1.1rem">لإنشاء حساب المدير الأول تحتاج رمز الإعداد الذي يملكه صاحب المكتبة فقط.</p>
+  <form data-sub="setup"><label class="f"><span>رمز الإعداد</span><input class="in" name="code" autocomplete="off" autocapitalize="characters" required style="direction:ltr;text-align:start"></label>
+  <label class="f"><span>اسم المكتبة</span><input class="in" name="shop" value="${esc(DEF.name)}" required></label>
   <label class="f"><span>اسمك</span><input class="in" name="name" required></label>
   <div class="g2"><label class="f"><span>اسم المستخدم (عربي أو رقم هاتف)</span><input class="in" name="u" autocapitalize="off" required></label>
-  <label class="f"><span>كلمة المرور (6 أحرف فأكثر)</span><input class="in" name="p" type="password" minlength="6" required></label></div>
-  <button class="btn pri lg" style="width:100%">إنشاء الحساب والبدء</button></form>`);
+  <label class="f"><span>كلمة المرور (8 أحرف فأكثر)</span><input class="in" name="p" type="password" minlength="8" required autocomplete="new-password"></label></div>
+  <button class="btn pri lg" style="width:100%">إنشاء الحساب والبدء</button><p id="lerr" class="sm" style="color:var(--red);margin-top:.5rem"></p></form>`);
 }
 Sub.setup=async f=>{
   const d=Object.fromEntries(new FormData(f));
-  DB.save('settings',{...S(),id:'main',name:d.shop.trim()});
+  if(!setupOpen()){location.hash='#/admin';return}
+  if(!(await Auth.setupOk(d.code))){$('#lerr').textContent='رمز الإعداد غير صحيح';return}
+  DB.save('settings',{...S(),id:'main',name:d.shop.trim(),setupDone:true});
   const saved=DB.save('users',await Auth.make(d.name.trim(),d.u,'admin',d.p));
   Auth.user=saved;localStorage.rm_sess=JSON.stringify({id:saved.id,t:Date.now()});
   VIEW='dash';location.hash='#/admin/dash';route();
@@ -1340,7 +1366,7 @@ const Store={
     <div class="st-w"><section class="sheet hero"><h1>${esc(s.name)}</h1><p>كتب مدرسية ودفاتر وأقلام وحقائب وكل قرطاسية الدوام. اطلب من هنا وتسلّم من المكتبة أو نوصّل الطلب إلى بيتك.</p>
     <div class="row"><button class="btn pri lg" data-act="sbrowse">تصفّح المنتجات</button>${s.phone?`<a class="btn lg" href="${waLink(s.phone,'مرحباً، أريد الاستفسار عن منتج')}" target="_blank" rel="noopener">${I('wa',20)}واتساب</a>`:''}</div></section>
     <div class="chips" id="scats"></div><div id="sgrid" class="sgrid"></div>
-    <footer class="sm mute" style="margin-top:3rem;padding-top:1rem;border-top:1px solid var(--line)"><b style="color:var(--ink)">${esc(s.name)}</b>${s.address?' • '+esc(s.address):''}${s.phone?' • '+esc(s.phone):''}</footer></div>
+    <footer class="sm mute" style="margin-top:3rem;padding-top:1rem;border-top:1px solid var(--line)"><b style="color:var(--ink)">${esc(s.name)}</b>${s.address?' • '+esc(s.address):''}${s.phone?' • '+esc(s.phone):''} • <a href="privacy.html" style="text-decoration:underline">سياسة الخصوصية</a></footer></div>
     ${s.phone?`<a class="wa" href="${waLink(s.phone,'مرحباً')}" target="_blank" rel="noopener" aria-label="واتساب">${I('wa',20)}<span>واتساب</span></a>`:''}`;
     paintTheme();this.paint();
   },
@@ -1401,12 +1427,6 @@ Sub.order=f=>{
 
 /* ============ التشغيل و PWA ============ */
 function setupPWA(){
-  try{
-    const icon='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#0F1F4D"/><rect x="112" y="88" width="288" height="336" rx="26" fill="#fff"/><path d="M172 88v336" stroke="#D6344B" stroke-width="10"/><path d="M212 172h150M212 234h150M212 296h104" stroke="#1B3FA0" stroke-width="18" stroke-linecap="round"/></svg>');
-    const l=document.createElement('link');l.rel='icon';l.href=icon;document.head.appendChild(l);
-    const base=location.origin+location.pathname,mf={name:S().name,short_name:S().name.slice(0,14),start_url:base+'#/admin',scope:base.replace(/[^/]*$/,''),display:'standalone',background_color:'#0F1F4D',theme_color:'#0F1F4D',lang:'ar',dir:'rtl',icons:[{src:icon,sizes:'any',type:'image/svg+xml',purpose:'any'}]};
-    const k=document.createElement('link');k.rel='manifest';k.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:'application/manifest+json'}));document.head.appendChild(k);
-  }catch(e){}
   if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 (async function boot(){
@@ -1426,7 +1446,7 @@ function setupPWA(){
 Act.acct=()=>{
   if(Cust.cur){
     const c=Cust.cur;
-    modal({title:'حسابي',body:`<div class="row" style="margin-bottom:1rem"><span class="av" style="width:48px;height:48px;font-size:1.3rem">${esc((c.fn||'؟')[0])}</span><div><b>${esc([c.fn,c.ln].filter(Boolean).join(' '))}</b><div class="mute sm">${esc(c.phone)}</div></div></div><div class="col1"><button class="btn" data-act="myorders">${I('receipt',16)}طلباتي السابقة</button><button class="btn" data-act="cout" style="color:var(--red)">${I('out',16)}تسجيل الخروج</button></div>`});
+    modal({title:'حسابي',body:`<div class="row" style="margin-bottom:1rem"><span class="av" style="width:48px;height:48px;font-size:1.3rem">${esc((c.fn||'؟')[0])}</span><div><b>${esc([c.fn,c.ln].filter(Boolean).join(' '))}</b><div class="mute sm">${esc(c.phone)}</div></div></div><div class="col1"><button class="btn" data-act="myorders">${I('receipt',16)}طلباتي السابقة</button><button class="btn" data-act="cout">${I('out',16)}تسجيل الخروج</button><button class="btn ghost" data-act="accdelme" style="color:var(--red)">${I('trash',16)}حذف حسابي</button></div>`});
     return;
   }
   modal({title:'حسابي',body:`<div class="seg" style="margin-bottom:1rem"><button class="on" data-act="ctab" data-t="login">تسجيل الدخول</button><button data-act="ctab" data-t="reg">حساب جديد</button></div>
@@ -1448,13 +1468,24 @@ Sub.creg=async f=>{
 Sub.clogin=async f=>{
   const d=Object.fromEntries(new FormData(f));let a=null;
   try{a=await DB.fetch('accounts','a_'+normPhone(d.p))}catch(e){toast('تعذّر الاتصال، حاول لاحقاً','err');return}
-  if(!a||!a.salt||await Auth.hash(d.pw,a.salt)!==a.pass){$('#cerr').textContent='رقم الهاتف أو كلمة المرور غير صحيحة';return}
+  if(!a||!(await Auth.verify(d.pw,a))){$('#cerr').textContent='رقم الهاتف أو كلمة المرور غير صحيحة';return}
   Cust.set(a);$$('.mdl').forEach(closeModal);toast('أهلاً '+(a.fn||''),'ok');Store.render();
 };
 Act.myorders=async()=>{
   $$('.mdl').forEach(closeModal);let l=[];
   try{l=(await DB.query('orders','accId',Cust.cur.id)).sort((a,b)=>b.ts-a.ts)}catch(e){toast('تعذّر تحميل الطلبات','err');return}
   modal({title:'طلباتي',body:l.length?`<div class="list">${l.map(o=>`<div class="li" style="align-items:flex-start"><div style="flex:1"><b class="disp">${esc(o.no)}</b> <span class="bd ${OST[o.status]?OST[o.status][1]:'mute'}">${OST[o.status]?OST[o.status][0]:''}</span><div class="sm mute">${dt(o.ts)} • ${o.items.map(i=>esc(i.name)+' ×'+i.qty).join('، ')}</div></div><b>${fmt(o.total)}</b></div>`).join('')}</div>`:empty('🛍️','لا طلبات بعد','ستظهر طلباتك هنا بعد أول طلب')});
+};
+
+Act.accdelme=()=>{
+  $$('.mdl').forEach(closeModal);
+  const m=modal({title:'حذف الحساب',body:`<form id="fdm"><p class="mute" style="margin-bottom:.8rem">سيُحذف حسابك (الاسم والهاتف والعنوان وكلمة المرور) نهائياً ولا يمكن التراجع. تبقى طلباتك السابقة في سجلات المكتبة دون ربطها بحسابك.</p><label class="f"><span>أدخل كلمة المرور للتأكيد</span><input class="in" name="pw" type="password" required autocomplete="current-password"></label></form>`,foot:`<button class="btn red" form="fdm">حذف حسابي نهائياً</button><button class="btn" data-act="close">إلغاء</button>`});
+  form(m,async d=>{
+    let a=null;try{a=await DB.fetch('accounts',Cust.cur.id)}catch(e){toast('تعذّر الاتصال، حاول لاحقاً','err');return false}
+    if(!a||!(await Auth.verify(d.pw,a))){toast('كلمة المرور غير صحيحة','err');return false}
+    try{const os=await DB.query('orders','accId',a.id);if(os.length)DB.batch(os.map(o=>({t:'set',col:'orders',doc:{...o,accId:''}})))}catch(e){}
+    DB.remove('accounts',a.id);Cust.out();toast('تم حذف حسابك','ok');Store.render();
+  });
 };
 
 </script>
