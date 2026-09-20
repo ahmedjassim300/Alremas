@@ -610,7 +610,7 @@ V.dash={t:'الرئيسية',html(){
   const tasks=DB.list('tasks').filter(t=>t.status!=='done'&&(adm||t.assignee===u.id||!t.assignee)).sort((a,b)=>(a.due||'9')<(b.due||'9')?-1:1).slice(0,6);
   const days=[...Array(7)].map((_,i)=>{const s=today-i*DAY;return{l:i?DAYS[new Date(s).getDay()]:'اليوم',v:Q.agg(Q.sales(s,s+DAY)).total,today:!i}});
   const recent=[...DB.list('sales')].sort((a,b)=>b.ts-a.ts).slice(0,6);
-  const wk={};Q.sales(today-6*DAY).forEach(s=>s.items.forEach(i=>{const k=i.pid;wk[k]=wk[k]||{n:i.name,q:0,v:0};wk[k].q+=i.qty;wk[k].v+=i.qty*i.price}));
+  const wk={};Q.sales(today-6*DAY).forEach(s=>s.items.forEach(i=>{if(i.pid==='ship')return;const k=i.pid;wk[k]=wk[k]||{n:i.name,q:0,v:0};wk[k].q+=i.qty;wk[k].v+=i.qty*i.price}));
   const top=Object.values(wk).sort((a,b)=>b.v-a.v).slice(0,5);
   const fresh=!DB.list('products').length;
   return `<div class="ph1"><div><h1>${h<12?'صباح الخير':'مساء الخير'}، ${esc(u.name)}</h1><div class="mute">${DAYS[new Date().getDay()]} ${dt(Date.now())}</div></div>
@@ -1151,19 +1151,27 @@ V.orders={t:'طلبات المتجر',html(){
   <div class="chips" style="margin-bottom:.9rem">${[['active','النشطة'],['done','المكتملة'],['cancelled','الملغاة']].map(([k,n])=>`<button class="chip ${OF===k?'on':''}" data-act="ofil" data-k="${k}">${n}</button>`).join('')}</div>
   ${l.length?`<div class="cgrid c2">${l.map(o=>`<div class="card"><div class="row" style="margin-bottom:.4rem"><b class="disp" style="font-size:1.25rem">${esc(o.no)}</b><span class="bd ${OST[o.status][1]}">${OST[o.status][0]}</span><span class="sp"></span><span class="sm mute">${dt(o.ts)} ${tm(o.ts)}</span></div>
   <div><b>${esc(o.name)}</b> • <a href="tel:${esc(o.phone)}" style="text-decoration:underline">${esc(o.phone)}</a></div><div class="sm mute">${o.delivery==='pickup'?'استلام من المكتبة':'توصيل: '+esc(o.addr||'')}${o.note?' • '+esc(o.note):''}</div>
-  <div class="list" style="margin:.6rem 0">${o.items.map(i=>`<div class="li" style="padding:.3rem 0"><span style="flex:1">${esc(i.name)} <span class="mute">× ${i.qty}</span></span><span>${fmt(i.price*i.qty)}</span></div>`).join('')}<div class="li b"><span style="flex:1">الإجمالي</span><span>${fmt(o.total)} ${S().cur}</span></div></div>
+  <div class="list" style="margin:.6rem 0">${o.items.map(i=>`<div class="li" style="padding:.3rem 0"><span style="flex:1">${esc(i.name)} <span class="mute">× ${i.qty}</span></span><span>${fmt(i.price*i.qty)}</span></div>`).join('')}${o.delivery==='delivery'?`<div class="li"><span style="flex:1">رسوم التوصيل</span><span>${o.shipping===null||o.shipping===undefined?'<span class="bd warn">لم تُحدَّد</span>':o.shipping?fmt(o.shipping):'مجاني'}</span></div>`:''}<div class="li b"><span style="flex:1">الإجمالي</span><span>${fmt(o.total)} ${S().cur}</span></div></div>
   <div class="row">${o.status==='new'?`<button class="btn pri s" data-act="ost" data-id="${o.id}" data-s="confirmed">تأكيد الطلب</button><button class="btn s" data-act="ost" data-id="${o.id}" data-s="cancelled" style="color:var(--red)">رفض</button>`:''}
   ${o.status==='confirmed'?`<button class="btn pri s" data-act="ost" data-id="${o.id}" data-s="ready">جاهز للتسليم</button>`:''}
   ${['confirmed','ready'].includes(o.status)?`<button class="btn hl s" data-act="otopos" data-id="${o.id}">${I('pos',15)}تحويل إلى فاتورة</button>`:''}
+  ${o.delivery==='delivery'&&['new','confirmed','ready'].includes(o.status)?`<button class="btn s" data-act="oship" data-id="${o.id}">${I('tag',15)}رسوم التوصيل</button>`:''}
   <a class="btn s" href="${waLink(o.phone,`مرحباً ${o.name}، بخصوص طلبك ${o.no} من ${S().name}`)}" target="_blank" rel="noopener">${I('wa',15)}واتساب</a></div></div>`).join('')}</div>`:empty('🛍️','لا طلبات هنا','شارك رابط المتجر مع زبائنك لتصلك الطلبات مباشرة')}`;
 }};
 Act.ofil=el=>{OF=el.dataset.k;refreshView()};
+Act.oship=async el=>{
+  const o=DB.get('orders',el.dataset.id);if(!o)return;
+  const v=await askNum('رسوم التوصيل','المبلغ ('+S().cur+') — 0 للتوصيل المجاني',o.shipping||'');if(v===null||v<0)return;
+  const sub=o.subtotal??o.items.reduce((a,i)=>a+i.price*i.qty,0);
+  DB.save('orders',{...o,subtotal:sub,shipping:v,total:sub+v});toast('تم تحديث رسوم التوصيل','ok');
+};
 Act.ost=el=>{const o=DB.get('orders',el.dataset.id);if(o)DB.save('orders',{...o,status:el.dataset.s})};
 Act.otopos=el=>{
   const o=DB.get('orders',el.dataset.id);if(!o)return;
   if(!Q.shift()){toast('افتح الوردية أولاً','err');Act.openShift();return}
   resetPos();
   o.items.forEach(i=>{const p=DB.get('products',i.pid);POS.cart.push({pid:i.pid,name:i.name,price:p?p.price:i.price,cost:p?p.cost||0:0,qty:i.qty,service:!!(p&&p.service)})});
+  if(o.shipping>0)POS.cart.push({pid:'ship',name:'رسوم التوصيل',price:o.shipping,cost:0,qty:1,service:true});
   let c=DB.list('customers').find(x=>x.phone&&x.phone===o.phone);if(!c)c=DB.save('customers',{name:o.name,phone:o.phone,balance:0});
   POS.cust=c.id;POS.orderId=o.id;go('pos');
 };
@@ -1180,11 +1188,11 @@ const barRow=(l,v,max,extra='')=>`<div class="li"><span style="width:38%;min-wid
 V.reports={t:'التقارير',html(){
   const [a,b]=rRange(),sales=Q.sales(a,b),ag=Q.agg(sales),exp=DB.list('expenses').filter(e=>e.ts>=a&&e.ts<b).reduce((s,e)=>s+e.amount,0),ref=DB.list('sales').filter(s=>s.status==='refunded'&&s.ts>=a&&s.ts<b);
   const g=(fn)=>{const m={};sales.forEach(s=>fn(s,m));return Object.entries(m).sort((x,y)=>y[1].v-x[1].v)};
-  const byCat=(()=>{const m={};sales.forEach(s=>s.items.forEach(i=>{const p=DB.get('products',i.pid),k=p?catOf(p.cat).n:'غير مصنّف';m[k]=(m[k]||0)+i.qty*i.price}));return Object.entries(m).sort((x,y)=>y[1]-x[1])})();
+  const byCat=(()=>{const m={};sales.forEach(s=>s.items.forEach(i=>{const p=DB.get('products',i.pid),k=i.pid==='ship'?'رسوم التوصيل':p?catOf(p.cat).n:'غير مصنّف';m[k]=(m[k]||0)+i.qty*i.price}));return Object.entries(m).sort((x,y)=>y[1]-x[1])})();
   const byPay=g((s,m)=>{const k=methodName[s.method];(m[k]=m[k]||{v:0}).v+=s.total});
   const byUser=g((s,m)=>{const k=s.byName||'—';(m[k]=m[k]||{v:0,n:0}).v+=s.total;m[k].n++});
   const byDay=(()=>{const m={};sales.forEach(s=>{const k=ymd(s.ts);m[k]=m[k]||{v:0,n:0,p:0};m[k].v+=s.total;m[k].n++;m[k].p+=s.total-s.items.reduce((x,i)=>x+(i.cost||0)*i.qty,0)});return Object.entries(m).sort((x,y)=>y[0]<x[0]?-1:1)})();
-  const prod={};sales.forEach(s=>s.items.forEach(i=>{const k=i.pid||i.name;prod[k]=prod[k]||{n:i.name,q:0,v:0,p:0};prod[k].q+=i.qty;prod[k].v+=i.qty*i.price;prod[k].p+=i.qty*(i.price-(i.cost||0))}));
+  const prod={};sales.forEach(s=>s.items.forEach(i=>{if(i.pid==='ship')return;const k=i.pid||i.name;prod[k]=prod[k]||{n:i.name,q:0,v:0,p:0};prod[k].q+=i.qty;prod[k].v+=i.qty*i.price;prod[k].p+=i.qty*(i.price-(i.cost||0))}));
   const top=Object.values(prod).sort((x,y)=>y.v-x.v).slice(0,10);
   const P=[['today','اليوم'],['yest','أمس'],['7','آخر 7 أيام'],['month','هذا الشهر'],['last','الشهر الماضي'],['custom','فترة مخصصة']];
   const net=ag.profit-exp;
@@ -1212,7 +1220,7 @@ V.settings={t:'الإعدادات',html(){
   const s=S(),us=DB.list('users'),cloud=DB.mode==='cloud',demo=COLS.some(c=>DB.list(c).some(x=>x.demo));
   return `<div class="cgrid c2" style="align-items:start"><div class="cgrid">
   <div class="card"><h3>بيانات المكتبة</h3><form data-sub="setshop"><label class="f"><span>اسم المكتبة</span><input class="in" name="name" value="${esc(s.name)}" required></label><div class="g2"><label class="f"><span>الهاتف / واتساب</span><input class="in" name="phone" value="${esc(s.phone)}" inputmode="tel" placeholder="07XXXXXXXXX"></label><label class="f"><span>العنوان</span><input class="in" name="address" value="${esc(s.address)}"></label></div>
-  <label class="f"><span>نص أسفل الفاتورة</span><input class="in" name="footer" value="${esc(s.footer)}"></label><div class="g2"><label class="f"><span>رمز العملة</span><input class="in" name="cur" value="${esc(s.cur)}"></label><label class="f"><span>حد إعادة الطلب الافتراضي</span><input class="in" name="low" inputmode="numeric" value="${s.low}"></label></div><button class="btn pri">حفظ الإعدادات</button></form></div>
+  <label class="f"><span>نص أسفل الفاتورة</span><input class="in" name="footer" value="${esc(s.footer)}"></label><div class="g2"><label class="f"><span>رمز العملة</span><input class="in" name="cur" value="${esc(s.cur)}"></label><label class="f"><span>حد إعادة الطلب الافتراضي</span><input class="in" name="low" inputmode="numeric" value="${s.low}"></label></div><div class="g2"><label class="f"><span>رسوم التوصيل (${esc(s.cur)}) <small class="mute">فارغ = تُحدَّد لكل طلب</small></span><input class="in" name="shipFee" inputmode="numeric" value="${typeof s.shipFee==='number'?s.shipFee:''}" placeholder="مثال: 3000"></label><label class="f"><span>توصيل مجاني للطلبات فوق <small class="mute">(اختياري)</small></span><input class="in" name="freeShip" inputmode="numeric" value="${s.freeShip||''}" placeholder="مثال: 50000"></label></div><button class="btn pri">حفظ الإعدادات</button></form></div>
   <div class="card"><h3>المستخدمون</h3><div class="list">${us.map(u=>`<div class="li"><span class="av">${esc(u.name[0]||'؟')}</span><div style="flex:1"><b>${esc(u.name)}</b> ${u.active===false?'<span class="bd red">موقوف</span>':''}<div class="sm mute">${esc(u.username)} • ${ROLES[u.role]}</div></div><button class="btn s" data-act="uedit" data-id="${u.id}">${I('edit',14)}تعديل</button></div>`).join('')}</div><button class="btn s" style="margin-top:.7rem" data-act="unew">${I('plus',15)}مستخدم جديد</button>
   <p class="sm mute" style="margin-top:.6rem">المدير: كل الصلاحيات • الكاشير: الصندوق والفواتير والعملاء • أمين المخزن: المنتجات والمهام.</p></div></div>
   <div class="cgrid">
@@ -1225,7 +1233,7 @@ V.settings={t:'الإعدادات',html(){
   <div class="card"><h3>النسخ الاحتياطي</h3><p class="sm mute" style="margin-bottom:.7rem">حمّل نسخة كاملة من بياناتك دورياً. الاستعادة تدمج الملف مع الموجود.</p><div class="row"><button class="btn" data-act="bkexp">${I('dl',16)}تنزيل نسخة احتياطية</button><label class="btn">${I('up',16)}استعادة من ملف<input type="file" accept=".json,application/json" hidden id="bkfile" data-ch="bkimp"></label></div></div>
   <div class="card"><h3>بيانات تجريبية</h3><p class="sm mute" style="margin-bottom:.7rem">منتجات وفواتير وعملاء ومهام وهمية لتجربة النظام. تُحذف كلها بضغطة واحدة دون المساس ببياناتك.</p><div class="row"><button class="btn" data-act="seed">حمّل بيانات تجريبية</button>${demo?`<button class="btn" data-act="unseed" style="color:var(--red)">${I('trash',15)}احذف البيانات التجريبية</button>`:''}</div></div></div></div>`;
 }};
-Sub.setshop=f=>{const d=Object.fromEntries(new FormData(f));DB.save('settings',{...S(),id:'main',name:d.name.trim(),phone:d.phone.trim(),address:d.address.trim(),footer:d.footer.trim(),cur:d.cur.trim()||'د.ع',low:num(d.low)});toast('تم حفظ الإعدادات','ok')};
+Sub.setshop=f=>{const d=Object.fromEntries(new FormData(f));DB.save('settings',{...S(),id:'main',name:d.name.trim(),phone:d.phone.trim(),address:d.address.trim(),footer:d.footer.trim(),cur:d.cur.trim()||'د.ع',low:num(d.low),shipFee:String(d.shipFee).trim()===''?null:num(d.shipFee),freeShip:String(d.freeShip).trim()===''?0:num(d.freeShip)});toast('تم حفظ الإعدادات','ok')};
 Act.fbsave=()=>{
   const t=$('#fbcfg').value.trim();if(!t)return;let cfg=null;
   try{cfg=JSON.parse(t)}catch(e){cfg={};t.replace(/(\w+)\s*:\s*["']([^"']+)["']/g,(m,k,v)=>cfg[k]=v)}
@@ -1396,32 +1404,53 @@ Act.sinc=el=>{
 };
 Act.sdec=el=>{const l=Store.cart.find(x=>x.pid===el.dataset.id);if(!l)return;if(--l.qty<=0)Store.cart=Store.cart.filter(x=>x!==l);Store.keep();Store.paint();Store.paintCart&&Store.paintCart()};
 Act.srm=el=>{Store.cart=Store.cart.filter(x=>x.pid!==el.dataset.id);Store.keep();Store.paint();Store.paintCart()};
+Store.mode='delivery';
+Store.fee=function(mode,sub){
+  const s=S();
+  if(mode!=='delivery')return{n:0};
+  if(s.freeShip>0&&sub>=s.freeShip)return{n:0,free:true};
+  if(typeof s.shipFee==='number')return{n:s.shipFee};
+  return{n:null};
+};
+Store.paintSum=function(){
+  const el=$('#ssum');if(!el)return;
+  const s=S(),cur=s.cur,sub=this.total(),f=this.fee(this.mode,sub);let row='',hint='';
+  if(this.mode!=='delivery')row=`<div class="tot"><span class="mute">استلام من المكتبة</span><b style="color:var(--ok)">بدون رسوم</b></div>`;
+  else if(f.free)row=`<div class="tot"><span class="mute">رسوم التوصيل</span><b style="color:var(--ok)">مجاني</b></div>`;
+  else if(f.n===null)row=`<div class="tot"><span class="mute">رسوم التوصيل</span><span class="sm">تُحدَّد عند تأكيد الطلب</span></div>`;
+  else row=`<div class="tot"><span class="mute">رسوم التوصيل</span><b>${fmt(f.n)} ${cur}</b></div>`;
+  if(this.mode==='delivery'&&s.freeShip>0&&sub<s.freeShip)hint=`<div class="sm mute" style="margin:.2rem 0">أضف مشتريات بـ ${fmt(s.freeShip-sub)} ${cur} للحصول على توصيل مجاني</div>`;
+  el.innerHTML=`<div class="tot"><span class="mute">مجموع المنتجات</span><span>${fmt(sub)} ${cur}</span></div>${row}${hint}<div class="tot g" style="margin-top:.4rem"><span class="b">الإجمالي</span><b>${fmt(sub+(f.n||0))} ${cur}</b></div>`;
+};
 Store.paintCart=function(){
   const el=$('#slines');if(!el)return;
   this.cart=this.cart.filter(l=>DB.get('products',l.pid));
-  el.innerHTML=this.cart.length?this.cart.map(l=>{const p=DB.get('products',l.pid);return `<div class="cl" style="grid-template-columns:auto 1fr auto auto"><button class="btn ic1 s ghost" data-act="srm" data-id="${p.id}" aria-label="حذف" style="color:var(--red)">${I('x',16)}</button><div class="cn"><b>${esc(p.name)}</b><small>${fmt(p.price)} ${S().cur}</small></div><div class="qs"><button data-act="sdec" data-id="${p.id}" aria-label="أنقص">−</button><input value="${l.qty}" readonly><button data-act="sinc" data-id="${p.id}" aria-label="زد">+</button></div><div class="ct">${fmt(p.price*l.qty)}</div></div>`}).join('')+`<div class="tot g" style="margin:.8rem 0"><span class="b">الإجمالي</span><b>${fmt(this.total())} ${S().cur}</b></div>`:empty('🛒','سلتك فارغة','أضف منتجات من المتجر لتبدأ');
+  el.innerHTML=this.cart.length?this.cart.map(l=>{const p=DB.get('products',l.pid);return `<div class="cl" style="grid-template-columns:auto 1fr auto auto"><button class="btn ic1 s ghost" data-act="srm" data-id="${p.id}" aria-label="حذف" style="color:var(--red)">${I('x',16)}</button><div class="cn"><b>${esc(p.name)}</b><small>${fmt(p.price)} ${S().cur}</small></div><div class="qs"><button data-act="sdec" data-id="${p.id}" aria-label="أنقص">−</button><input value="${l.qty}" readonly><button data-act="sinc" data-id="${p.id}" aria-label="زد">+</button></div><div class="ct">${fmt(p.price*l.qty)}</div></div>`}).join(''):empty('🛒','سلتك فارغة','أضف منتجات من المتجر لتبدأ');
   const b=$('#osub');if(b)b.disabled=!this.cart.length;
+  this.paintSum();
 };
 Act.scart=()=>{
+  Store.mode='delivery';
   const m=modal({title:'سلة الطلب',wide:0,body:`<div id="slines"></div><form data-sub="order" id="ordf" style="margin-top:.6rem;padding-top:1rem;border-top:1px solid var(--line)"><b style="display:block;margin-bottom:.6rem">بيانات الاستلام</b>
   <div class="g2"><label class="f"><span>الاسم</span><input class="in" name="n" required autocomplete="name"></label><label class="f"><span>رقم الهاتف</span><input class="in" name="p" inputmode="tel" required pattern="[0-9٠-٩+ ]{10,15}" title="أدخل رقم هاتف صحيحاً" autocomplete="tel"></label></div>
   <div class="seg" style="margin-bottom:.9rem"><button type="button" class="on" data-act="odel" data-m="delivery">توصيل للبيت</button><button type="button" data-act="odel" data-m="pickup">استلام من المكتبة</button></div><input type="hidden" name="m" value="delivery">
   <label class="f" id="addrw"><span>العنوان (المنطقة وأقرب نقطة دالة)</span><input class="in" name="a"></label><label class="f"><span>ملاحظات (اختياري)</span><input class="in" name="t"></label>
-  <button class="btn pri lg" id="osub" style="width:100%">إرسال الطلب</button><p class="sm mute" style="margin-top:.5rem">الدفع عند الاستلام. سنتواصل معك لتأكيد الطلب.</p></form>`});
+  <div id="ssum" style="margin:.4rem 0 .9rem;padding:.7rem .8rem;background:var(--paper);border-radius:10px"></div><button class="btn pri lg" id="osub" style="width:100%">إرسال الطلب</button><p class="sm mute" style="margin-top:.5rem">الدفع عند الاستلام. سنتواصل معك لتأكيد الطلب.</p></form>`});
   Store.m=m;m._close=()=>{Store.m=null;Store.paint()};Store.paintCart();
   if(Cust.cur){const f=$('#ordf').elements;f.n.value=[Cust.cur.fn,Cust.cur.ln].filter(Boolean).join(' ');f.p.value=Cust.cur.phone;f.a.value=Cust.cur.addr||''}
 };
-Act.odel=el=>{const f=el.closest('form');f.elements.m.value=el.dataset.m;$$('.seg button',f).forEach(b=>b.classList.toggle('on',b===el));$('#addrw').style.display=el.dataset.m==='delivery'?'':'none';f.elements.a.required=el.dataset.m==='delivery'};
+Act.odel=el=>{Store.mode=el.dataset.m;const f=el.closest('form');f.elements.m.value=el.dataset.m;$$('.seg button',f).forEach(b=>b.classList.toggle('on',b===el));$('#addrw').style.display=el.dataset.m==='delivery'?'':'none';f.elements.a.required=el.dataset.m==='delivery';Store.paintSum()};
 Sub.order=f=>{
   const d=Object.fromEntries(new FormData(f));
   if(!Store.cart.length){toast('السلة فارغة','err');return}
   const items=[];
   for(const l of Store.cart){const p=DB.get('products',l.pid);if(!p||l.qty>(p.stock||0)){toast('الكمية المطلوبة من «'+(p?p.name:'منتج')+'» غير متوفرة','err');return}items.push({pid:p.id,name:p.name,qty:l.qty,price:p.price})}
-  const o={id:uid(),no:'W'+String(Date.now()).slice(-6),ts:Date.now(),name:d.n.trim(),phone:d.p.trim(),addr:d.m==='delivery'?d.a.trim():'',delivery:d.m,note:d.t.trim(),accId:Cust.cur?Cust.cur.id:'',items,total:items.reduce((a,i)=>a+i.price*i.qty,0),status:'new',via:'store'};
+  const sub=items.reduce((a,i)=>a+i.price*i.qty,0),fee=Store.fee(d.m,sub);
+  const o={id:uid(),no:'W'+String(Date.now()).slice(-6),ts:Date.now(),name:d.n.trim(),phone:d.p.trim(),addr:d.m==='delivery'?d.a.trim():'',delivery:d.m,note:d.t.trim(),accId:Cust.cur?Cust.cur.id:'',items,subtotal:sub,shipping:fee.n,total:sub+(fee.n||0),status:'new',via:'store'};
   DB.save('orders',o);Store.cart=[];Store.keep();
   const m=Store.m;Store.m=null;if(m){m._close=null;m.remove()}
-  const s=S(),msg=`طلب جديد ${o.no}\n${o.items.map(i=>`• ${i.name} × ${i.qty}`).join('\n')}\nالإجمالي: ${fmt(o.total)} ${s.cur}\nالاسم: ${o.name}\n${o.delivery==='delivery'?'العنوان: '+o.addr:'استلام من المكتبة'}`;
-  modal({title:'وصلنا طلبك ✓',body:`<p style="margin-bottom:.6rem">رقم طلبك <b class="disp" style="font-size:1.4rem">${o.no}</b></p><p class="mute">الإجمالي ${fmt(o.total)} ${esc(s.cur)} — سنتواصل معك على ${esc(o.phone)} لتأكيد الطلب.</p>`,foot:`${s.phone?`<a class="btn pri" href="${waLink(s.phone,msg)}" target="_blank" rel="noopener">${I('wa',16)}أرسل تفاصيل الطلب على واتساب</a>`:''}<button class="btn" data-act="close">تم</button>`});
+  const s=S(),msg=`طلب جديد ${o.no}\n${o.items.map(i=>`• ${i.name} × ${i.qty}`).join('\n')}\n${o.delivery==='delivery'?(o.shipping===null?'رسوم التوصيل: تُحدَّد عند التأكيد':'رسوم التوصيل: '+(o.shipping?fmt(o.shipping)+' '+s.cur:'مجاني')):'استلام من المكتبة'}\nالإجمالي: ${fmt(o.total)} ${s.cur}\nالاسم: ${o.name}\n${o.delivery==='delivery'?'العنوان: '+o.addr:'استلام من المكتبة'}`;
+  modal({title:'وصلنا طلبك ✓',body:`<p style="margin-bottom:.6rem">رقم طلبك <b class="disp" style="font-size:1.4rem">${o.no}</b></p><p class="mute">الإجمالي ${fmt(o.total)} ${esc(s.cur)}${o.delivery==='delivery'?(o.shipping===null?' + رسوم التوصيل (تُحدَّد عند التأكيد)':o.shipping?' (يشمل التوصيل '+fmt(o.shipping)+')':' (توصيل مجاني)'):''} — سنتواصل معك على ${esc(o.phone)} لتأكيد الطلب.</p>`,foot:`${s.phone?`<a class="btn pri" href="${waLink(s.phone,msg)}" target="_blank" rel="noopener">${I('wa',16)}أرسل تفاصيل الطلب على واتساب</a>`:''}<button class="btn" data-act="close">تم</button>`});
   Store.paint();
 };
 
