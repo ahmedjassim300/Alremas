@@ -1,0 +1,38 @@
+{
+  "id": "./",
+  "name": "مكتبة الريماس",
+  "short_name": "الريماس",
+  "description": "متجر مكتبة الريماس: كتب مدرسية ودفاتر وأقلام وقرطاسية، مع طلب من البيت.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F0E2",
+  "theme_color": "#0F1F4D",
+  "categories": [
+    "shopping",
+    "business"
+  ],
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "دخول الموظفين",
+      "short_name": "الموظفون",
+      "url": "./#/admin",
+      "icons": [
+        {
+          "src": "icon.png",
+          "sizes": "512x512"
+        }
+      ]
+    }
+  ]
+}
