@@ -288,7 +288,7 @@ td.e,th.e{text-align:end}
 .chbtn{display:flex;flex-direction:column;align-items:center;position:relative}
 .chbtn .rbt-fab{width:96px;height:120px;filter:drop-shadow(0 14px 12px rgba(15,31,77,.28));margin-bottom:-22px;position:relative;z-index:1}
 .chlab{display:inline-flex;align-items:center;gap:.4rem;background:linear-gradient(180deg,var(--pri2),var(--pri));color:var(--onpri);border-radius:99px;padding:.6rem 1.15rem;font-weight:700;box-shadow:0 14px 22px -10px rgba(27,63,160,.85),inset 0 1px 0 rgba(255,255,255,.3);position:relative;z-index:2}
-.chtease{background:var(--card);border:1px solid var(--line);border-radius:16px 16px 16px 4px;padding:.5rem .8rem;font-weight:600;font-size:.88rem;box-shadow:0 12px 22px -12px rgba(15,31,77,.6);transition:.25s;max-width:190px}
+.chtease{background:var(--card);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:.4rem .65rem;font-weight:600;font-size:.76rem;line-height:1.4;box-shadow:0 10px 18px -10px rgba(15,31,77,.6);transition:opacity .3s,transform .3s;max-width:132px}
 .chtease.wait{opacity:0;transform:translateY(6px) scale(.95);pointer-events:none;height:0;padding:0;overflow:hidden;border:0}
 .chat{position:fixed;left:.8rem;bottom:1.2rem;z-index:90;width:min(370px,calc(100vw - 1.6rem));height:min(580px,calc(100vh - 3rem));display:flex;flex-direction:column;background:var(--card);border-radius:26px;overflow:hidden;box-shadow:0 34px 60px -22px rgba(15,31,77,.65),0 0 0 1px var(--line);transform:translateY(20px) scale(.96);opacity:0;pointer-events:none;transition:.22s;transform-origin:bottom left}
 .chat.open{transform:none;opacity:1;pointer-events:auto}
@@ -386,10 +386,13 @@ td.e,th.e{text-align:end}
 @keyframes rbw{0%,50%,100%{transform:rotate(0)}60%{transform:rotate(-42deg)}70%{transform:rotate(-6deg)}80%{transform:rotate(-42deg)}90%{transform:rotate(-6deg)}}
 @keyframes rbw2{0%,100%{transform:rotate(0)}50%{transform:rotate(6deg)}}
 @keyframes rbt{0%,100%{transform:scale(.7);opacity:.5}50%{transform:scale(1.25);opacity:1}}
-.chbtn .rbt-fab{width:108px;height:131px}
-.rbt-sm{width:44px;height:54px;margin-top:8px}
-.rbt-hub{width:170px;height:206px}
-@media (max-width:760px){.chbtn .rbt-fab{width:88px;height:107px}}
+.chbtn{cursor:grab;touch-action:manipulation}
+.chfab.dragging{transition:none!important}
+.chfab.dragging .chbtn{cursor:grabbing}
+.chbtn .rbt-fab{width:66px;height:80px}
+.rbt-sm{width:38px;height:46px;margin-top:6px}
+.rbt-hub{width:118px;height:143px}
+@media (max-width:760px){.chbtn .rbt-fab{width:52px;height:63px}.rbt-hub{width:84px;height:102px}}
 @media (prefers-reduced-motion:reduce){.rbt *{animation:none!important}}
 .chul{margin:.4rem 0 0;padding-inline-start:1.2rem;line-height:1.9}
 /* ===== games ===== */
@@ -2015,11 +2018,11 @@ const ROBOT_DEFS=`<svg width="0" height="0" style="position:absolute" aria-hidde
 <filter id="rb-drop" x="-25%" y="-25%" width="150%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="3.2" flood-color="#0F1F4D" flood-opacity=".3"/></filter>
 <filter id="rb-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.2"/></filter></defs></svg>`;
 const ROBOT=(c='')=>`<svg class="rbt ${c}" viewBox="0 0 140 170" aria-hidden="true"><ellipse class="rb-glw" cx="70" cy="163" rx="28" ry="5" fill="#35D3FF" opacity=".45" filter="url(#rb-blur)"/><ellipse cx="70" cy="163" rx="20" ry="3" fill="#0F1F4D" opacity=".18"/><g class="rb-fl">
-<path d="M70 26V15" stroke="#B5C3DE" stroke-width="3.4" stroke-linecap="round"/><g class="rb-ant"><circle cx="70" cy="11" r="6.8" fill="#FF5A78" opacity=".45" filter="url(#rb-blur)"/><circle cx="70" cy="11" r="5.6" fill="url(#rb-orb)"/><circle cx="68.3" cy="9.3" r="1.6" fill="#fff" opacity=".85"/></g>
+<path d="M70 26V15" stroke="#B5C3DE" stroke-width="3.4" stroke-linecap="round"/><g class="rb-ant"><circle cx="70" cy="11" r="6.8" fill="#35D3FF" opacity=".5" filter="url(#rb-blur)"/><circle cx="70" cy="11" r="5.6" fill="url(#rb-eye)"/><circle cx="68.3" cy="9.3" r="1.6" fill="#fff" opacity=".9"/></g>
 <g class="rb-al"><path d="M44 112C30 116 24 128 26 140" stroke="url(#rb-limb)" stroke-width="12" stroke-linecap="round" fill="none" filter="url(#rb-drop)"/><circle cx="26" cy="141" r="8" fill="url(#rb-limb)" filter="url(#rb-drop)"/></g>
 <g class="rb-ar"><path d="M96 112C110 116 116 128 114 140" stroke="url(#rb-limb)" stroke-width="12" stroke-linecap="round" fill="none" filter="url(#rb-drop)"/><circle cx="114" cy="141" r="8" fill="url(#rb-limb)" filter="url(#rb-drop)"/></g>
 <path d="M42 108C42 98 98 98 98 108L96 138C95 156 45 156 44 138Z" fill="url(#rb-white)" filter="url(#rb-drop)"/><path d="M48 112C56 104 78 103 90 108" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none" opacity=".85"/>
-<circle cx="70" cy="128" r="10.5" fill="#152356"/><circle cx="70" cy="128" r="10.5" fill="none" stroke="url(#rb-ring)" stroke-width="2.4"/><path d="M62 124.5q4-2.4 8 .8q4-3.2 8-.8v9.6q-4-2.4-8 .8q-4-3.2-8-.8z" fill="#7DE6FF"/><path d="M70 125.3v9.6" stroke="#152356" stroke-width="1.2"/>
+<circle cx="70" cy="128" r="13" fill="#35D3FF" opacity=".45" filter="url(#rb-blur)"/><circle cx="70" cy="128" r="10.5" fill="#152356"/><circle cx="70" cy="128" r="10.5" fill="none" stroke="url(#rb-ring)" stroke-width="2.4"/><circle cx="70" cy="128" r="5.6" fill="url(#rb-eye)"/>
 <rect x="60" y="96" width="20" height="9" rx="4" fill="#9FB0D6"/>
 <circle cx="17" cy="66" r="11" fill="url(#rb-limb)" filter="url(#rb-drop)"/><circle cx="17" cy="66" r="6.2" fill="#152356"/><circle cx="17" cy="66" r="6.2" fill="none" stroke="url(#rb-ring)" stroke-width="2"/>
 <circle cx="123" cy="66" r="11" fill="url(#rb-limb)" filter="url(#rb-drop)"/><circle cx="123" cy="66" r="6.2" fill="#152356"/><circle cx="123" cy="66" r="6.2" fill="none" stroke="url(#rb-ring)" stroke-width="2"/>
@@ -2027,15 +2030,49 @@ const ROBOT=(c='')=>`<svg class="rbt ${c}" viewBox="0 0 140 170" aria-hidden="tr
 <rect x="29" y="38" width="82" height="54" rx="25" fill="url(#rb-visor)"/><rect x="29" y="38" width="82" height="54" rx="25" fill="none" stroke="#0A1233" stroke-width="1.4"/>
 <path d="M38 47C52 40 72 40 86 44" stroke="#fff" stroke-width="3.2" stroke-linecap="round" fill="none" opacity=".33"/><circle cx="98" cy="49" r="2" fill="#fff" opacity=".4"/>
 <ellipse cx="42" cy="76" rx="6.5" ry="3.6" fill="#FF7FA0" opacity=".38"/><ellipse cx="98" cy="76" rx="6.5" ry="3.6" fill="#FF7FA0" opacity=".38"/>
-<g class="rb-eyes"><ellipse cx="53" cy="62" rx="9" ry="11.4" fill="#35D3FF" opacity=".5" filter="url(#rb-blur)"/><ellipse cx="53" cy="62" rx="7.6" ry="10" fill="url(#rb-eye)"/><ellipse cx="50.6" cy="57.6" rx="2.6" ry="3.4" fill="#fff" opacity=".95"/>
-<ellipse cx="87" cy="62" rx="9" ry="11.4" fill="#35D3FF" opacity=".5" filter="url(#rb-blur)"/><ellipse cx="87" cy="62" rx="7.6" ry="10" fill="url(#rb-eye)"/><ellipse cx="84.6" cy="57.6" rx="2.6" ry="3.4" fill="#fff" opacity=".95"/></g>
-<path d="M62 78Q70 85.5 78 78" stroke="#7DE6FF" stroke-width="3" stroke-linecap="round" fill="none"/>
+<g class="rb-eyes"><path d="M43 63q10-13 20 0" stroke="#35D3FF" stroke-width="7.5" stroke-linecap="round" fill="none" opacity=".55" filter="url(#rb-blur)"/><path d="M43 63q10-13 20 0" stroke="url(#rb-ring)" stroke-width="6" stroke-linecap="round" fill="none"/>
+<path d="M77 63q10-13 20 0" stroke="#35D3FF" stroke-width="7.5" stroke-linecap="round" fill="none" opacity=".55" filter="url(#rb-blur)"/><path d="M77 63q10-13 20 0" stroke="url(#rb-ring)" stroke-width="6" stroke-linecap="round" fill="none"/></g>
+<path d="M60 80Q70 88 80 80" stroke="#7DE6FF" stroke-width="3" stroke-linecap="round" fill="none"/>
 <path class="rb-sp1" d="M126 30l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#FFE45C"/><path class="rb-sp2" d="M12 36l1.4 3.4 3.4 1.4-3.4 1.4-1.4 3.4-1.4-3.4-3.4-1.4 3.4-1.4z" fill="#9BEBFF"/></g></svg>`;
 
 /* ---------- الدردشة مع المساعد (مساعد آلي مدرَّب على بيانات المتجر) ---------- */
 const STOP=new Set(['هل','يوجد','عندكم','عندك','اريد','ابي','ابغي','ابغى','شنو','شلون','كم','بكم','شكد','سعر','اسعار','من','في','على','عن','لو','سمحت','وين','احتاج','اكو','ماكو','لدي','لديكم','متوفر','متوفره','يا','او','و','ال','لي','لك','ممكن','رجاء','اذا','هواي','هواية','شي','حبيبي','استاذ','اخي','عزيزي','لطفا']);
 const CORE=['notes','pens','art','geo','bags','office'];
 const OPENERS=['بكل سرور','تفضّل','بالتأكيد','حاضر'];
+/* اسحب فقاعة الدردشة لتحريكها (ضغط مطوّل ثم تحريك)، وتُحفظ آخر موضع */
+const FabDrag={
+  init(){
+    const fab=$('#chfab');if(!fab||fab._dragBound)return;fab._dragBound=true;
+    const btn=fab.querySelector('.chbtn')||fab;
+    let sx=0,sy=0,ox=0,oy=0,timer=null,dragging=false;
+    try{const p=JSON.parse(localStorage.rm_chatpos||'null');if(p)this.place(fab,p.x,p.y)}catch(e){}
+    const move=e=>{
+      const cx=e.clientX!=null?e.clientX:(e.touches?e.touches[0].clientX:0),cy=e.clientY!=null?e.clientY:(e.touches?e.touches[0].clientY:0),dx=cx-sx,dy=cy-sy;
+      if(!dragging){if(Math.hypot(dx,dy)>8)clearTimeout(timer);return}
+      this.place(fab,ox+dx,oy+dy);
+    };
+    const up=()=>{
+      clearTimeout(timer);removeEventListener('pointermove',move);removeEventListener('pointerup',up);removeEventListener('pointercancel',up);
+      if(dragging){
+        dragging=false;fab.classList.remove('dragging');fab.style.touchAction='';
+        const r=fab.getBoundingClientRect();try{localStorage.rm_chatpos=JSON.stringify({x:r.left,y:r.top})}catch(e){}
+        btn._suppressClick=true;setTimeout(()=>btn._suppressClick=false,80);
+      }
+    };
+    btn.addEventListener('pointerdown',e=>{
+      if(e.button&&e.button!==0)return;
+      const r=fab.getBoundingClientRect();sx=e.clientX;sy=e.clientY;ox=r.left;oy=r.top;dragging=false;
+      timer=setTimeout(()=>{dragging=true;fab.classList.add('dragging');fab.style.touchAction='none'},380);
+      addEventListener('pointermove',move);addEventListener('pointerup',up);addEventListener('pointercancel',up);
+    });
+    btn.addEventListener('click',e=>{if(btn._suppressClick){e.stopPropagation();e.preventDefault()}});
+  },
+  place(fab,x,y){
+    const r=fab.getBoundingClientRect(),vw=innerWidth,vh=innerHeight;
+    x=Math.min(Math.max(x,6),vw-r.width-6);y=Math.min(Math.max(y,6),vh-r.height-6);
+    fab.style.left=x+'px';fab.style.top=y+'px';fab.style.right='auto';fab.style.bottom='auto';
+  }
+};
 const Chat={
   open:false,msgs:[],typing:false,teased:false,ctx:{hits:[],cat:null},chips:null,n:0,
   DEF:['ابحث عن منتج','مستلزمات مدرسية','العروض','رسوم التوصيل','ألعاب الذكاء','تواصل مع موظف'],
@@ -2045,13 +2082,14 @@ const Chat={
   op(){return OPENERS[this.n++%OPENERS.length]},
   mount(){
     const w=$('#chatw');if(!w)return;const s=S();w.classList.toggle('chopen',this.open);
-    w.innerHTML=`<div class="chfab" id="chfab"><div class="chtease ${this.open||this.teased?'':'wait'}" id="chtease">مرحباً 👋 أنا مساعدك، اسألني!</div><button class="chbtn" data-act="chatopen" aria-label="فتح الدردشة">${ROBOT('rbt-fab')}<span class="chlab">${I('wa',18)}دردشة</span></button></div>
+    w.innerHTML=`<div class="chfab" id="chfab"><div class="chtease ${this.open||this.teased?'':'wait'}" id="chtease">أسألني عن أي منتج 👋</div><button class="chbtn" data-act="chatopen" aria-label="فتح الدردشة">${ROBOT('rbt-fab')}<span class="chlab">${I('wa',18)}دردشة</span></button></div>
     <section class="chat ${this.open?'open':''}" id="chat" aria-label="الدردشة"><header class="chh"><span class="cha">${ROBOT('rbt-sm')}</span><div style="flex:1;min-width:0"><b>مساعد ${esc(s.name)}</b><small><i class="on"></i>مساعد آلي • متصل الآن</small></div><button class="btn ic1 ghost" data-act="chatclose" aria-label="إغلاق" style="color:#fff">${I('x')}</button></header>
     <div class="chlog" id="chlog" aria-live="polite"></div><div class="chq" id="chq"></div>
     <form class="chf" data-sub="chat"><input class="in" name="m" autocomplete="off" placeholder="اكتب سؤالك أو اسم المنتج…" aria-label="رسالتك"><button class="btn pri ic1" aria-label="إرسال">${I('left',18)}</button></form></section>`;
     if(!this.msgs.length)this.msgs.push({from:'bot',html:`${this.greet()}! أنا المساعد الآلي لـ<b>${esc(s.name)}</b>، ويسعدني خدمتك.<br>يمكنني مساعدتك في البحث عن المنتجات والأسعار والعروض والتوصيل وتجهيز مستلزمات المدرسة. كيف أقدر أخدمك؟`});
     this.paintQ();this.paint();
-    if(!this.teased&&!this.open){setTimeout(()=>{this.teased=true;const t=$('#chtease');if(t){t.classList.remove('wait');setTimeout(()=>t&&t.classList.add('wait'),6000)}},3500)}
+    if(!this.teased&&!this.open){setTimeout(()=>{this.teased=true;const t=$('#chtease');if(t){t.classList.remove('wait');setTimeout(()=>t&&t.classList.add('wait'),3000)}},900)}
+    FabDrag.init();
   },
   paintQ(){const q=$('#chq');if(q)q.innerHTML=(this.chips||this.DEF).map(t=>`<button class="chip" data-act="chq" data-q="${esc(t)}">${esc(t)}</button>`).join('')},
   paint(){const el=$('#chlog');if(!el)return;el.innerHTML=this.msgs.map(m=>`<div class="chm ${m.from}">${m.html}</div>`).join('')+(this.typing?'<div class="chm bot"><span class="dots"><i></i><i></i><i></i></span></div>':'');el.scrollTop=el.scrollHeight},
